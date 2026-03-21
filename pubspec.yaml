@@ -1,0 +1,38 @@
+name: student_app
+description: "Canteen Ordering App - Modern food delivery UI for students"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.6.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  provider: ^6.1.2
+
+  # UI
+  google_fonts: ^6.2.1
+  shimmer: ^3.0.0
+  flutter_animate: ^4.5.0
+  cached_network_image: ^3.3.1
+
+  # Storage
+  shared_preferences: ^2.3.2
+
+  # Utils
+  uuid: ^4.4.0
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
