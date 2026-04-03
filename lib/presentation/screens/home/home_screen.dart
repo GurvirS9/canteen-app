@@ -110,7 +110,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               CircleAvatar(
                                 radius: 22,
                                 backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
-                                    ? NetworkImage(user!.avatarUrl)
+                                    ? NetworkImage(user.avatarUrl)
                                     : null,
                                 backgroundColor: Colors.white,
                                 child: user?.avatarUrl == null || user!.avatarUrl.isEmpty

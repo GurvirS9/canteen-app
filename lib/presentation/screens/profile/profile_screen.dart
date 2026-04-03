@@ -43,7 +43,7 @@ class ProfileScreen extends ConsumerWidget {
                           radius: 42,
                           backgroundColor: Colors.white,
                           backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
-                              ? NetworkImage(user!.avatarUrl)
+                              ? NetworkImage(user.avatarUrl)
                               : null,
                           child: user?.avatarUrl == null || user!.avatarUrl.isEmpty
                               ? const Icon(Icons.person,
