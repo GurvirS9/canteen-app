@@ -1,20 +1,36 @@
 class AppConstants {
-  // API
-  static const String baseUrl = 'https://api.example.com';
+  // API — production backend on Railway
+  static const String baseUrl = 'https://kanteen-queue-production.up.railway.app/api';
+
+  /// Socket.IO URL — same host as API but without /api path
+  static String get socketUrl {
+    if (baseUrl.endsWith('/api')) {
+      return baseUrl.substring(0, baseUrl.length - 4);
+    }
+    return baseUrl;
+  }
+
+  /// Root URL for resolving uploaded image paths like /uploads/xyz.jpg
+  /// e.g. https://kanteen-queue-production.up.railway.app
+  static String get imageBaseUrl => socketUrl;
+
   static const String menuEndpoint = '/menu';
+  static String menuItemEndpoint(String id) => '/menu/$id';
+  static String menuItemImageEndpoint(String id) => '/menu/$id/image';
+
   static const String slotsEndpoint = '/slots';
-  static const String orderEndpoint = '/order';
+  static const String slotsCheckEndpoint = '/slots/check';
+  static const String ordersEndpoint = '/orders';
+  static const String activeOrdersEndpoint = '/orders/active';
+  // Use with string interpolation: '/orders/$id/status'
+  static String orderStatusEndpoint(String id) => '/orders/$id/status';
 
-  // Demo mode
-  static const bool demoMode = true;
 
-  // Demo credentials
-  static const String demoEmail = 'demo@canteen.com';
-  static const String demoPassword = 'password123';
 
-  // Routes
   static const String splashRoute = '/';
   static const String loginRoute = '/login';
+  static const String signupRoute = '/signup';
+  static const String forgotPasswordRoute = '/forgot-password';
   static const String homeRoute = '/home';
   static const String cartRoute = '/cart';
   static const String orderSuccessRoute = '/order-success';

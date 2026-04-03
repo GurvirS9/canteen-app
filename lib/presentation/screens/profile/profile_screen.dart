@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/order.dart';
 import 'package:student_app/presentation/providers/auth_provider.dart';
+import 'package:student_app/presentation/providers/debug_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/presentation/providers/theme_provider.dart';
 import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    final orderProvider = context.watch<OrderProvider>();
-    final user = auth.user;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final user = authState.valueOrNull;
+    final orderState = ref.watch(orderProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -41,10 +42,10 @@ class ProfileScreen extends StatelessWidget {
                         CircleAvatar(
                           radius: 42,
                           backgroundColor: Colors.white,
-                          backgroundImage: user?.avatarUrl != null
+                          backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
                               ? NetworkImage(user!.avatarUrl)
                               : null,
-                          child: user?.avatarUrl == null
+                          child: user?.avatarUrl == null || user!.avatarUrl.isEmpty
                               ? const Icon(Icons.person,
                                   size: 36, color: AppColors.primary)
                               : null,
@@ -89,7 +90,7 @@ class ProfileScreen extends StatelessWidget {
                 child: Text('Order History', style: theme.textTheme.titleMedium),
               ),
               const SizedBox(height: 10),
-              orderProvider.orderHistory.isEmpty
+              orderState.orderHistory.isEmpty
                   ? const Padding(
                       padding: EdgeInsets.all(16),
                       child: Text('No orders yet.'),
@@ -98,10 +99,10 @@ class ProfileScreen extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: orderProvider.orderHistory.length,
+                      itemCount: orderState.orderHistory.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 8),
                       itemBuilder: (ctx, i) {
-                        final order = orderProvider.orderHistory[i];
+                        final order = orderState.orderHistory[i];
                         return _orderHistoryTile(context, order)
                             .animate()
                             .fadeIn(delay: (i * 80).ms)
@@ -125,12 +126,31 @@ class ProfileScreen extends StatelessWidget {
                   style: theme.textTheme.bodyMedium,
                 ),
               ),
-              _settingsTile(
-                context,
-                icon: Icons.phone_outlined,
-                label: 'Contact Support',
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Call: +91 1234 567890')),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Consumer(
+                  builder: (ctx, ref, _) {
+                    final debug = ref.watch(debugProvider);
+                    return ListTile(
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      tileColor: theme.cardTheme.color,
+                      leading: const Icon(Icons.bug_report_rounded,
+                          color: AppColors.primary),
+                      title: Text('Debug Mode',
+                          style: theme.textTheme.bodyLarge),
+                      subtitle: Text('Show errors on screen',
+                          style: theme.textTheme.bodyMedium
+                              ?.copyWith(fontSize: 11)),
+                      trailing: Switch.adaptive(
+                        value: debug.debugMode,
+                        activeTrackColor: AppColors.primary,
+                        onChanged: (_) => debug.toggleDebugMode(),
+                      ),
+                      onTap: () => debug.toggleDebugMode(),
+                    );
+                  },
                 ),
               ),
 
@@ -162,9 +182,9 @@ class ProfileScreen extends StatelessWidget {
                         label: Text('Dark'),
                         icon: Icon(Icons.nightlight_round, size: 18)),
                   ],
-                  selected: {context.watch<ThemeProvider>().themeMode},
+                  selected: {ref.watch(themeModeProvider)},
                   onSelectionChanged: (Set<ThemeMode> newSelection) {
-                    context.read<ThemeProvider>().setThemeMode(newSelection.first);
+                    ref.read(themeModeProvider.notifier).setThemeMode(newSelection.first);
                   },
                 ),
               ),
@@ -173,7 +193,7 @@ class ProfileScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                 child: OutlinedButton.icon(
-                  onPressed: () => _logout(context),
+                  onPressed: () => _logout(context, ref),
                   icon: const Icon(Icons.logout_rounded),
                   label: const Text('Logout'),
                   style: OutlinedButton.styleFrom(
@@ -299,7 +319,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
+  Future<void> _logout(BuildContext context, WidgetRef ref) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -319,10 +339,7 @@ class ProfileScreen extends StatelessWidget {
       ),
     );
     if (confirm == true && context.mounted) {
-      final auth = context.read<AuthProvider>();
-      final navigator = Navigator.of(context);
-      await auth.logout();
-      navigator.pushNamedAndRemoveUntil(AppConstants.loginRoute, (_) => false);
+      await ref.read(authStateProvider.notifier).logout();
     }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:student_app/presentation/providers/menu_provider.dart';
 import 'package:student_app/presentation/providers/auth_provider.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
@@ -9,21 +10,21 @@ import 'package:student_app/presentation/widgets/menu_item_card.dart';
 import 'package:student_app/presentation/widgets/shimmer_loader.dart';
 import 'package:student_app/presentation/widgets/empty_state_widget.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MenuProvider>().fetchMenu();
+      ref.read(menuProvider.notifier).fetchMenu();
     });
   }
 
@@ -35,31 +36,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final menu = context.watch<MenuProvider>();
-    final auth = context.watch<AuthProvider>();
+    final menuState = ref.watch(menuProvider);
+    final menuNotifier = ref.read(menuProvider.notifier);
+    
+    final authState = ref.watch(authStateProvider);
+    final user = authState.valueOrNull;
+    
+    final cartNotifier = ref.watch(cartProvider.notifier);
+    // Observe cart to update totals
+    ref.watch(cartProvider);
+    
     final theme = Theme.of(context);
 
     return Scaffold(
-      floatingActionButton: Consumer<CartProvider>(
-        builder: (ctx, cart, child) {
-          if (cart.itemCount == 0) return const SizedBox.shrink();
-          return FloatingActionButton.extended(
-            onPressed: () => Navigator.pushNamed(context, AppConstants.cartRoute),
-            backgroundColor: AppColors.primary,
-            icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
-            label: Text(
-              '${cart.itemCount} items • ₹${cart.total.toStringAsFixed(0)}',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+      floatingActionButton: cartNotifier.itemCount == 0
+          ? const SizedBox.shrink()
+          : FloatingActionButton.extended(
+              onPressed: () => context.push('/cart'),
+              backgroundColor: AppColors.primary,
+              icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
+              label: Text(
+                '${cartNotifier.itemCount} items • ₹${cartNotifier.total.toStringAsFixed(0)}',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ),
-          );
-        },
-      ),
       body: RefreshIndicator(
-        onRefresh: menu.refresh,
+        onRefresh: () async => menuNotifier.refresh(),
         color: AppColors.primary,
         child: CustomScrollView(
           slivers: [
-            // App bar with greeting + search (search embedded in gradient)
             SliverAppBar(
               expandedHeight: 168,
               pinned: true,
@@ -78,14 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          // Greeting row
                           Row(
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Hello, ${auth.user?.name.split(' ').first ?? 'Student'} 👋',
+                                    'Hello, ${user?.name.split(' ').first ?? 'Student'} 👋',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 20,
@@ -105,18 +109,17 @@ class _HomeScreenState extends State<HomeScreen> {
                               const Spacer(),
                               CircleAvatar(
                                 radius: 22,
-                                backgroundImage: auth.user?.avatarUrl != null
-                                    ? NetworkImage(auth.user!.avatarUrl)
+                                backgroundImage: user?.avatarUrl != null && user!.avatarUrl.isNotEmpty
+                                    ? NetworkImage(user!.avatarUrl)
                                     : null,
                                 backgroundColor: Colors.white,
-                                child: auth.user?.avatarUrl == null
+                                child: user?.avatarUrl == null || user!.avatarUrl.isEmpty
                                     ? const Icon(Icons.person,
                                         color: AppColors.primary)
                                     : null,
                               ),
                             ],
                           ),
-                          // Search bar — sits inside the gradient, no gap
                           Container(
                             decoration: BoxDecoration(
                               color: theme.scaffoldBackgroundColor,
@@ -131,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             child: TextField(
                               controller: _searchController,
-                              onChanged: context.read<MenuProvider>().search,
+                              onChanged: menuNotifier.search,
                               decoration: InputDecoration(
                                 hintText: 'Search dishes, categories...',
                                 prefixIcon: const Icon(Icons.search_rounded,
@@ -141,9 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         icon: const Icon(Icons.clear_rounded),
                                         onPressed: () {
                                           _searchController.clear();
-                                          context
-                                              .read<MenuProvider>()
-                                              .search('');
+                                          menuNotifier.search('');
                                           setState(() {});
                                         },
                                       )
@@ -163,14 +164,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Top Controls Row: Category and Diet Preference
             SliverToBoxAdapter(
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   children: [
-                    // Category Dropdown
                     Container(
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -181,7 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-                          value: menu.selectedCategory,
+                          value: menuState.selectedCategory,
                           icon: const Padding(
                             padding: EdgeInsets.only(left: 6),
                             child: Icon(Icons.keyboard_arrow_down_rounded, size: 18),
@@ -190,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                           dropdownColor: theme.cardTheme.color,
                           onChanged: (val) {
-                            if (val != null) context.read<MenuProvider>().selectCategory(val);
+                            if (val != null) menuNotifier.selectCategory(val);
                           },
                           items: AppConstants.categories
                               .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -199,7 +198,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Diet Filter Dropdown
                     Container(
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -210,7 +208,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<DietaryFilter>(
-                          value: menu.dietaryFilter,
+                          value: menuState.dietaryFilter,
                           icon: const Padding(
                             padding: EdgeInsets.only(left: 6),
                             child: Icon(Icons.keyboard_arrow_down_rounded, size: 18),
@@ -219,7 +217,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                           dropdownColor: theme.cardTheme.color,
                           onChanged: (val) {
-                            if (val != null) context.read<MenuProvider>().setDietaryFilter(val);
+                            if (val != null) menuNotifier.setDietaryFilter(val);
                           },
                           items: const [
                             DropdownMenuItem(value: DietaryFilter.all, child: Text('All Diets')),
@@ -235,7 +233,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Section title, Sort Dropdown and Counter
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               sliver: SliverToBoxAdapter(
@@ -243,16 +240,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        menu.selectedCategory == AppConstants.categories.first
+                        menuState.selectedCategory == AppConstants.categories.first
                             ? 'All Items'
-                            : menu.selectedCategory,
+                            : menuState.selectedCategory,
                         style: theme.textTheme.titleMedium,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Sorting dropdown
                     Container(
                       height: 32,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -262,13 +258,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<SortOption>(
-                          value: menu.selectedSort,
+                          value: menuState.selectedSort,
                           icon: const Icon(Icons.sort_rounded, size: 16),
                           isDense: true,
                           style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
                           dropdownColor: theme.cardTheme.color,
                           onChanged: (val) {
-                            if (val != null) context.read<MenuProvider>().setSortOption(val);
+                            if (val != null) menuNotifier.setSortOption(val);
                           },
                           items: const [
                             DropdownMenuItem(value: SortOption.bestsellers, child: Text('Top')),
@@ -280,9 +276,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    if (!menu.isLoading)
+                    if (!menuState.isLoading)
                       Text(
-                        '${menu.items.length} items',
+                        '${menuState.items.length} items',
                         style: theme.textTheme.bodySmall,
                       ),
                   ],
@@ -290,22 +286,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Content
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              sliver: menu.isLoading
+              sliver: menuState.isLoading
                   ? const SliverToBoxAdapter(child: ShimmerLoader())
-                  : menu.error != null
+                  : menuState.error != null
                       ? SliverToBoxAdapter(
                           child: EmptyStateWidget(
                             icon: Icons.wifi_off_rounded,
                             title: 'Oops!',
-                            subtitle: menu.error!,
+                            subtitle: menuState.error!,
                             actionLabel: 'Retry',
-                            onAction: menu.fetchMenu,
+                            onAction: menuNotifier.fetchMenu,
                           ),
                         )
-                      : menu.items.isEmpty
+                      : menuState.items.isEmpty
                           ? SliverToBoxAdapter(
                               child: EmptyStateWidget(
                                 icon: Icons.search_off_rounded,
@@ -315,17 +310,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 actionLabel: 'Clear Search',
                                 onAction: () {
                                   _searchController.clear();
-                                  context.read<MenuProvider>().search('');
-                                  context
-                                      .read<MenuProvider>()
-                                      .selectCategory(AppConstants.categories.first);
+                                  menuNotifier.search('');
+                                  menuNotifier.selectCategory(AppConstants.categories.first);
                                 },
                               ),
                             )
                           : SliverGrid(
                               delegate: SliverChildBuilderDelegate(
-                                (ctx, i) => MenuItemCard(item: menu.items[i]),
-                                childCount: menu.items.length,
+                                (ctx, i) => MenuItemCard(item: menuState.items[i]),
+                                childCount: menuState.items.length,
                               ),
                               gridDelegate:
                                   const SliverGridDelegateWithFixedCrossAxisCount(

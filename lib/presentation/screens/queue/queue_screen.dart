@@ -1,203 +1,267 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/order.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
+import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/presentation/widgets/empty_state_widget.dart';
+import 'package:go_router/go_router.dart';
 
-class QueueScreen extends StatelessWidget {
+class QueueScreen extends ConsumerWidget {
   const QueueScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final orderProvider = context.watch<OrderProvider>();
-    final order = orderProvider.activeOrder;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final orderState = ref.watch(orderProvider);
+    final orderNotifier = ref.read(orderProvider.notifier);
+    final activeOrders = orderState.activeOrders
+        .where((o) => o.status != OrderStatus.collected)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Order Queue'),
+        title: Text(
+          activeOrders.length > 1
+              ? 'Order Queue (${activeOrders.length})'
+              : 'Order Queue',
+        ),
         actions: [
-          if (orderProvider.hasActiveOrder)
+          if (activeOrders.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.refresh_rounded),
-              onPressed: orderProvider.refreshQueue,
+              onPressed: orderNotifier.refreshQueue,
               tooltip: 'Refresh',
             ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: orderProvider.refreshQueue,
+        onRefresh: orderNotifier.refreshQueue,
         color: AppColors.primary,
-        child: !orderProvider.hasActiveOrder
+        child: activeOrders.isEmpty
             ? ListView(
                 children: [
                   EmptyStateWidget(
                     icon: Icons.receipt_long_outlined,
-                    title: 'No Active Order',
+                    title: 'No Active Orders',
                     subtitle: 'Place an order to track it here.',
                     actionLabel: 'Browse Menu',
-                    onAction: () =>
-                        DefaultTabController.of(context).animateTo(0),
+                    onAction: () => context.go('/home'),
                   ),
                 ],
               )
-            : ListView(
+            : ListView.separated(
                 padding: const EdgeInsets.all(20),
-                children: [
-                  // Order ID header
-                  _orderHeader(context, order!),
-                  const SizedBox(height: 24),
-                  // Status stepper
-                  _statusStepper(context, order),
-                  const SizedBox(height: 24),
-                  // ETA + Queue position cards
-                  _infoCards(context, order),
-                  const SizedBox(height: 24),
-                  // Items summary
-                  _itemsSummary(context, order),
-
-                  if (order.status == OrderStatus.ready) ...[
-                    const SizedBox(height: 24),
-                    _readyBanner(context, orderProvider),
-                  ],
-                ],
+                itemCount: activeOrders.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 20),
+                itemBuilder: (context, index) {
+                  final order = activeOrders[index];
+                  return _OrderCard(
+                    order: order,
+                    index: index,
+                  );
+                },
               ),
       ),
     );
   }
+}
 
-  Widget _orderHeader(BuildContext context, Order order) {
+class _OrderCard extends ConsumerWidget {
+  final Order order;
+  final int index;
+
+  const _OrderCard({
+    required this.order,
+    required this.index,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          const Text('🧾', style: TextStyle(fontSize: 32)),
-          const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Order ${order.id}',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
-              Text(
-                '${order.status.emoji} ${order.status.label}',
-                style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
-              ),
-            ],
+        color: Theme.of(context).cardTheme.color,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    ).animate().fadeIn().slideY(begin: 0.2);
+      child: Column(
+        children: [
+          _orderHeader(context, order),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+            child: Column(
+              children: [
+                _statusStepper(context, order),
+                const SizedBox(height: 16),
+                _infoCards(context, order),
+                const SizedBox(height: 16),
+                _itemsSummary(context, order),
+                if (order.status == OrderStatus.ready) ...[
+                  const SizedBox(height: 16),
+                  _readyBanner(context, ref, order),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: (index * 100).ms).slideY(begin: 0.15);
+  }
+
+  Widget _orderHeader(BuildContext context, Order order) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        gradient: AppColors.primaryGradient,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Row(
+        children: [
+          const Text('🧾', style: TextStyle(fontSize: 28)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Order ${order.id}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${order.status.emoji} ${order.status.label}',
+                  style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9), fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _statusStepper(BuildContext context, Order order) {
     final statuses = [
-      OrderStatus.placed,
-      OrderStatus.confirmed,
+      OrderStatus.pending,
       OrderStatus.preparing,
       OrderStatus.ready,
+      OrderStatus.collected,
     ];
     final currentStep = statuses.indexOf(order.status);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardTheme.color,
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Order Status',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 16),
-          ...List.generate(statuses.length, (i) {
-            final isCompleted = i <= currentStep;
-            final isCurrent = i == currentStep;
-            final isLast = i == statuses.length - 1;
-            return _stepItem(
-                context, statuses[i], isCompleted, isCurrent, isLast, i);
-          }),
-        ],
-      ),
-    ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.2);
-  }
-
-  Widget _stepItem(BuildContext context, OrderStatus status, bool isCompleted,
-      bool isCurrent, bool isLast, int index) {
-    return Row(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: isCompleted ? AppColors.primary : const Color(0xFFE5E7EB),
-                shape: BoxShape.circle,
-                boxShadow: isCurrent
-                    ? [
-                        const BoxShadow(
-                          color: Color(0x50FF6B35),
-                          blurRadius: 10,
-                          spreadRadius: 2,
-                        )
-                      ]
-                    : [],
-              ),
-              child: Center(
-                child: isCompleted
-                    ? Text(status.emoji, style: const TextStyle(fontSize: 14))
-                    : Text('${index + 1}',
-                        style: const TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w600)),
-              ),
-            ),
-            if (!isLast)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                width: 2,
-                height: 32,
-                color:
-                    isCompleted ? AppColors.primary : const Color(0xFFE5E7EB),
-              ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                status.label,
-                style: TextStyle(
-                  fontWeight:
-                      isCurrent ? FontWeight.w700 : FontWeight.w500,
-                  color: isCompleted
-                      ? AppColors.primary
-                      : const Color(0xFFADB5BD),
-                  fontSize: 14,
+        Text('Status',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                )),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const double dotSize = 28;
+            final double totalWidth = constraints.maxWidth;
+            final double spacing = (totalWidth - dotSize) / (statuses.length - 1);
+
+            return Column(
+              children: [
+                SizedBox(
+                  height: dotSize,
+                  child: Stack(
+                    children: [
+                      for (int i = 0; i < statuses.length - 1; i++)
+                        Positioned(
+                          left: (i * spacing) + dotSize,
+                          top: dotSize / 2 - 1,
+                          width: spacing - dotSize,
+                          height: 2,
+                          child: Container(
+                            color: i < currentStep
+                                ? AppColors.primary
+                                : const Color(0xFFE5E7EB),
+                          ),
+                        ),
+                      for (int i = 0; i < statuses.length; i++)
+                        Positioned(
+                          left: i * spacing,
+                          top: 0,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 400),
+                            width: dotSize,
+                            height: dotSize,
+                            decoration: BoxDecoration(
+                              color: i <= currentStep
+                                  ? AppColors.primary
+                                  : const Color(0xFFE5E7EB),
+                              shape: BoxShape.circle,
+                              boxShadow: i == currentStep
+                                  ? [
+                                      const BoxShadow(
+                                        color: Color(0x50FF6B35),
+                                        blurRadius: 8,
+                                        spreadRadius: 1,
+                                      )
+                                    ]
+                                  : [],
+                            ),
+                            child: Center(
+                              child: i <= currentStep
+                                  ? Text(statuses[i].emoji,
+                                      style: const TextStyle(fontSize: 12))
+                                  : Text('${i + 1}',
+                                      style: const TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.grey,
+                                          fontWeight: FontWeight.w600)),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-              if (!isLast) const SizedBox(height: 20),
-            ],
-          ),
+                const SizedBox(height: 6),
+                SizedBox(
+                  height: 24,
+                  child: Stack(
+                    children: [
+                      for (int i = 0; i < statuses.length; i++)
+                        Positioned(
+                          left: (i * spacing) + (dotSize / 2) - (spacing / 2),
+                          top: 0,
+                          width: spacing,
+                          child: Text(
+                            statuses[i].label,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: i == currentStep
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: i <= currentStep
+                                  ? AppColors.primary
+                                  : Colors.grey,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -214,37 +278,38 @@ class QueueScreen extends StatelessWidget {
             value: '${order.estimatedMinutes} min',
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: _infoCard(
             context,
             icon: '🔢',
-            label: 'Queue Position',
+            label: 'Queue',
             value: '#${order.queuePosition}',
           ),
         ),
       ],
-    ).animate().fadeIn(delay: 200.ms);
+    );
   }
 
   Widget _infoCard(BuildContext context,
       {required String icon, required String label, required String value}) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(14),
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
-          Text(icon, style: const TextStyle(fontSize: 28)),
-          const SizedBox(height: 6),
+          Text(icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(height: 4),
           Text(value,
-              style: theme.textTheme.titleLarge
-                  ?.copyWith(color: AppColors.primary, fontSize: 22)),
-          const SizedBox(height: 2),
-          Text(label, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12)),
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(color: AppColors.primary, fontSize: 18)),
+          Text(label,
+              style:
+                  theme.textTheme.bodySmall?.copyWith(fontSize: 11)),
         ],
       ),
     );
@@ -253,40 +318,35 @@ class QueueScreen extends StatelessWidget {
   Widget _itemsSummary(BuildContext context, Order order) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(14),
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Text('Order Items', style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          Text(
-            order.displaySummary,
-            style: theme.textTheme.bodyLarge,
+          Expanded(
+            child: Text(
+              order.displaySummary,
+              style: theme.textTheme.bodyMedium,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Total', style: theme.textTheme.titleMedium),
-              Text(
-                '₹${order.totalAmount.toStringAsFixed(2)}',
-                style: theme.textTheme.titleMedium
-                    ?.copyWith(color: AppColors.primary),
-              ),
-            ],
+          const SizedBox(width: 8),
+          Text(
+            '₹${order.totalAmount.toStringAsFixed(2)}',
+            style: theme.textTheme.titleMedium
+                ?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
           ),
         ],
       ),
-    ).animate().fadeIn(delay: 300.ms);
+    );
   }
 
-  Widget _readyBanner(BuildContext context, OrderProvider orderProvider) {
+  Widget _readyBanner(BuildContext context, WidgetRef ref, Order order) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.success.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(14),
@@ -294,22 +354,27 @@ class QueueScreen extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Text('🎉', style: TextStyle(fontSize: 36)),
-          const SizedBox(height: 8),
+          const Text('🎉', style: TextStyle(fontSize: 30)),
+          const SizedBox(height: 6),
           const Text(
             'Your order is ready!',
             style: TextStyle(
-                fontWeight: FontWeight.w700, fontSize: 18, color: AppColors.success),
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: AppColors.success),
           ),
           const SizedBox(height: 4),
-          const Text('Please collect at Counter 2',
-              style: TextStyle(fontSize: 13)),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: orderProvider.completeOrder,
-            style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.success),
-            child: const Text('Mark as Collected ✓'),
+          Text('Please collect at ${AppConstants.canteenName}',
+              style: const TextStyle(fontSize: 12)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => ref.read(orderProvider.notifier).completeOrder(order.id),
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success),
+              child: const Text('Mark as Collected ✓'),
+            ),
           ),
         ],
       ),

@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/menu_item.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
+import 'menu_item_image.dart';
 import 'veg_nonveg_badge.dart';
 import 'quantity_control.dart';
 
-class MenuItemCard extends StatelessWidget {
+class MenuItemCard extends ConsumerWidget {
   final MenuItem item;
   final VoidCallback? onTap;
 
   const MenuItemCard({super.key, required this.item, this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final cart = context.watch<CartProvider>();
-    final qty = cart.quantityOf(item.id);
+    final cartNotifier = ref.watch(cartProvider.notifier);
+    // Observe cart state
+    ref.watch(cartProvider);
+    final qty = cartNotifier.quantityOf(item.id);
 
     return GestureDetector(
       onTap: onTap,
@@ -37,41 +40,16 @@ class MenuItemCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Image
+            // Image with placeholder fallback
             Stack(
               children: [
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(16)),
-                  child: AspectRatio(
-                    aspectRatio: 16 / 10,
-                    child: Image.network(
-                      item.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: const Color(0xFFF1F5F9),
-                        child: const Center(
-                          child: Icon(Icons.fastfood_rounded,
-                              size: 40, color: Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                      loadingBuilder: (_, child, progress) {
-                        if (progress == null) return child;
-                        return Container(
-                          color: const Color(0xFFF1F5F9),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              value: progress.expectedTotalBytes != null
-                                  ? progress.cumulativeBytesLoaded /
-                                      progress.expectedTotalBytes!
-                                  : null,
-                              strokeWidth: 2,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                AspectRatio(
+                  aspectRatio: 16 / 10,
+                  child: MenuItemImage(
+                    imageUrl: item.imageUrl,
+                    itemName: item.name,
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(16)),
                   ),
                 ),
                 // Veg badge top-left
@@ -172,9 +150,7 @@ class MenuItemCard extends StatelessWidget {
                             width: double.infinity,
                             child: ElevatedButton(
                               onPressed: item.isAvailable
-                                  ? () => context
-                                      .read<CartProvider>()
-                                      .addItem(item)
+                                  ? () => cartNotifier.addItem(item)
                                   : null,
                               style: ElevatedButton.styleFrom(
                                 padding:
@@ -188,9 +164,9 @@ class MenuItemCard extends StatelessWidget {
                         : QuantityControl(
                             quantity: qty,
                             onIncrement: () =>
-                                context.read<CartProvider>().addItem(item),
+                                cartNotifier.addItem(item),
                             onDecrement: () =>
-                                context.read<CartProvider>().removeItem(item),
+                                cartNotifier.removeItem(item),
                           ),
                   ),
                 ],

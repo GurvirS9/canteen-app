@@ -1,51 +1,66 @@
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/user.dart';
 import 'package:student_app/data/services/auth_service.dart';
 
-class AuthProvider extends ChangeNotifier {
-  final AuthService _authService = AuthService();
+final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 
-  User? _user;
-  bool _isLoading = false;
-  String? _errorMessage;
+final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
+  return AuthNotifier(ref.read(authServiceProvider));
+});
 
-  User? get user => _user;
-  bool get isLoading => _isLoading;
-  String? get errorMessage => _errorMessage;
-  bool get isLoggedIn => _user != null;
+class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
+  final AuthService _authService;
+
+  AuthNotifier(this._authService) : super(const AsyncValue.loading());
 
   Future<void> checkSession() async {
-    _isLoading = true;
-    notifyListeners();
+    state = const AsyncValue.loading();
     try {
-      _user = await _authService.checkSession();
-    } catch (_) {
-      _user = null;
+      final user = await _authService.checkSession();
+      state = AsyncValue.data(user);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<bool> login(String email, String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
+    state = const AsyncValue.loading();
     try {
-      _user = await _authService.login(email, password);
-      _isLoading = false;
-      notifyListeners();
+      final user = await _authService.login(email, password);
+      state = AsyncValue.data(user);
       return true;
-    } catch (e) {
-      _errorMessage = e.toString().replaceFirst('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> signup(String name, String email, String password) async {
+    state = const AsyncValue.loading();
+    try {
+      final user = await _authService.signup(name, email, password);
+      state = AsyncValue.data(user);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  Future<bool> sendPasswordResetEmail(String email) async {
+    state = const AsyncValue.loading();
+    try {
+      await _authService.sendPasswordResetEmail(email);
+      state = const AsyncValue.data(null);
+      return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
       return false;
     }
   }
 
   Future<void> logout() async {
     await _authService.logout();
-    _user = null;
-    notifyListeners();
+    state = const AsyncValue.data(null);
   }
 }

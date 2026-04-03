@@ -6,40 +6,42 @@ import 'package:student_app/presentation/providers/auth_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController(text: '');
   final _emailController = TextEditingController(text: '');
   final _passwordController = TextEditingController(text: '');
   bool _obscurePassword = true;
 
   @override
   void dispose() {
+    _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
     final authNotifier = ref.read(authStateProvider.notifier);
-    final success = await authNotifier.login(
+    final success = await authNotifier.signup(
+      _nameController.text.trim(),
       _emailController.text.trim(),
       _passwordController.text,
     );
     if (!mounted) return;
     if (success) {
-      // Initialize real-time socket connection for order updates
       ref.read(orderProvider.notifier).initSocket();
-      // Router handles redirect automatically based on auth state
+      // Router handles redirect automatically
     } else {
-      final errorMsg = ref.read(authStateProvider).error?.toString() ?? 'Login failed';
+      final errorMsg = ref.read(authStateProvider).error?.toString() ?? 'Signup failed';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(errorMsg.replaceFirst('Exception: ', '')),
@@ -52,7 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-
+  @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
     final isLoading = authState.isLoading;
@@ -73,7 +75,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               child: Stack(
                 children: [
-                  // Background dots
                   Positioned(
                     top: -30,
                     right: -30,
@@ -98,7 +99,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ),
                   ),
-                  // Content
                   Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -118,13 +118,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             ],
                           ),
                           child: const Center(
-                            child: Text('🍽️', style: TextStyle(fontSize: 40)),
+                            child: Text('👋', style: TextStyle(fontSize: 40)),
                           ),
                         ).animate().scale(
                             duration: 500.ms, curve: Curves.elasticOut),
                         const SizedBox(height: 16),
                         const Text(
-                          'CampusEats',
+                          'Join CampusEats',
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w800,
@@ -134,7 +134,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ).animate().fadeIn(delay: 200.ms),
                         const SizedBox(height: 4),
                         Text(
-                          'Sign in to order delicious food',
+                          'Create an account to start ordering',
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.white.withValues(alpha: 0.85),
@@ -156,24 +156,41 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Welcome back 👋',
+                      'Create Account ✨',
                       style: Theme.of(context).textTheme.titleLarge,
                     ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
                     const SizedBox(height: 4),
                     Text(
-                      'Login to continue',
+                      'Sign up to continue',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ).animate().fadeIn(delay: 450.ms),
                     const SizedBox(height: 28),
 
-                    // Email
+                    TextFormField(
+                      controller: _nameController,
+                      keyboardType: TextInputType.name,
+                      textInputAction: TextInputAction.next,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        hintText: 'John Doe',
+                        prefixIcon: Icon(Icons.person_outline),
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Please enter your name';
+                        }
+                        return null;
+                      },
+                    ).animate().fadeIn(delay: 480.ms).slideY(begin: 0.2),
+                    const SizedBox(height: 16),
+
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
                         labelText: 'Email',
-                        hintText: 'demo@canteen.com',
+                        hintText: 'student@canteen.com',
                         prefixIcon: Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
@@ -189,12 +206,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.2),
                     const SizedBox(height: 16),
 
-                    // Password
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _login(),
+                      onFieldSubmitted: (_) => _signup(),
                       decoration: InputDecoration(
                         labelText: 'Password',
                         hintText: '••••••••',
@@ -217,38 +233,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         return null;
                       },
                     ).animate().fadeIn(delay: 550.ms).slideY(begin: 0.2),
-                    
-                    // Forgot Password Nav
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: () {
-                          context.push('/forgot-password');
-                        },
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Forgot Password?',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                    ),
-                    ).animate().fadeIn(delay: 580.ms),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
 
                     const SizedBox(height: 28),
 
-                    // Login button
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: isLoading ? null : _login,
+                        onPressed: isLoading ? null : _signup,
                         child: isLoading
                             ? const SizedBox(
                                 height: 20,
@@ -256,19 +248,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2),
                               )
-                            : const Text('Sign In'),
+                            : const Text('Sign Up'),
                       ),
                     ).animate().fadeIn(delay: 650.ms).slideY(begin: 0.3),
                     const SizedBox(height: 20),
 
-                    // Signup Nav
                     Center(
                       child: TextButton(
                         onPressed: () {
-                          context.go('/signup');
+                          // Change to go
+                          context.go('/login');
                         },
                         child: Text(
-                          "Don't have an account? Sign up",
+                          'Already have an account? Login',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.w600,
@@ -278,8 +270,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ).animate().fadeIn(delay: 680.ms),
                     const SizedBox(height: 12),
 
-
-                    // Divider hint
                     Center(
                       child: Text(
                         'Protected by CampusEats Security 🔒',

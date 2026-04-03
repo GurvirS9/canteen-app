@@ -1,41 +1,45 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/presentation/providers/notification_provider.dart';
+import 'package:student_app/presentation/providers/order_provider.dart';
+import 'package:student_app/presentation/widgets/active_order_banner.dart';
 import 'package:student_app/core/theme/app_theme.dart';
-import 'home/home_screen.dart';
-import 'cart/cart_screen.dart';
-import 'queue/queue_screen.dart';
-import 'notifications/notifications_screen.dart';
-import 'profile/profile_screen.dart';
 
-class MainNavigationScreen extends StatefulWidget {
-  const MainNavigationScreen({super.key});
+class MainShell extends ConsumerStatefulWidget {
+  final int currentIndex;
+  final Widget child;
+  final ValueChanged<int> onTabChanged;
+
+  const MainShell({
+    super.key,
+    required this.currentIndex,
+    required this.child,
+    required this.onTabChanged,
+  });
 
   @override
-  State<MainNavigationScreen> createState() => _MainNavigationScreenState();
+  ConsumerState<MainShell> createState() => _MainShellState();
 }
 
-class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _currentIndex = 0;
-
-  final List<Widget> _screens = const [
-    HomeScreen(),
-    CartScreen(),
-    QueueScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
-
+class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
-    final notifProvider = context.watch<NotificationProvider>();
+    // We cannot use watch(provider.notifier).itemCount since itemcount is computed and not reactive via notifier alone if state doesn't change, wait we should watch the provider.
+    final cartState = ref.watch(cartProvider);
+    final currentCartCount = cartState.fold<int>(0, (sum, e) => sum + e.quantity);
+    
+    final notifState = ref.watch(notificationProvider);
+    final orderState = ref.watch(orderProvider);
+    
+    final showBanner = widget.currentIndex != 2 && orderState.hasActiveOrder;
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      body: Column(
+        children: [
+          Expanded(child: widget.child),
+          if (showBanner) const ActiveOrderBanner(),
+        ],
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -48,8 +52,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ],
         ),
         child: BottomNavigationBar(
-          currentIndex: _currentIndex,
-          onTap: (i) => setState(() => _currentIndex = i),
+          currentIndex: widget.currentIndex,
+          onTap: widget.onTabChanged,
           items: [
             const BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu_outlined),
@@ -61,7 +65,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   const Icon(Icons.shopping_cart_outlined),
-                  if (cart.itemCount > 0)
+                  if (currentCartCount > 0)
                     Positioned(
                       top: -6,
                       right: -6,
@@ -74,7 +78,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            '${cart.itemCount}',
+                            '$currentCartCount',
                             style: const TextStyle(
                                 fontSize: 10,
                                 color: Colors.white,
@@ -89,7 +93,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   const Icon(Icons.shopping_cart_rounded),
-                  if (cart.itemCount > 0)
+                  if (currentCartCount > 0)
                     Positioned(
                       top: -6,
                       right: -6,
@@ -102,7 +106,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            '${cart.itemCount}',
+                            '$currentCartCount',
                             style: const TextStyle(
                                 fontSize: 10,
                                 color: Colors.white,
@@ -125,7 +129,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 clipBehavior: Clip.none,
                 children: [
                   const Icon(Icons.notifications_outlined),
-                  if (notifProvider.unreadCount > 0)
+                  if (notifState.unreadCount > 0)
                     Positioned(
                       top: -4,
                       right: -4,

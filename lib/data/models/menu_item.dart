@@ -25,18 +25,23 @@ class MenuItem {
     this.preparationTime = 10,
   });
 
+  /// Maps from backend JSON keys:
+  ///   name, price, prepTime, image
+  /// Falls back to app-side keys when present (for demo/mock data).
   factory MenuItem.fromJson(Map<String, dynamic> json) => MenuItem(
-        id: json['id'] as String,
+        id: (json['_id'] ?? json['id'] ?? '').toString(),
         name: json['name'] as String,
-        description: json['description'] as String,
+        description: (json['description'] as String?) ?? '',
         price: (json['price'] as num).toDouble(),
-        imageUrl: json['imageUrl'] as String,
-        category: json['category'] as String,
-        isVeg: json['isVeg'] as bool,
+        imageUrl: (json['image'] ?? json['imageUrl'] ?? '') as String,
+        category: (json['category'] as String?) ?? 'Snacks',
+        isVeg: json['isVeg'] as bool? ?? true,
         isEgg: json['isEgg'] as bool? ?? false,
         isAvailable: json['isAvailable'] as bool? ?? true,
         rating: (json['rating'] as num?)?.toDouble() ?? 4.0,
-        preparationTime: json['preparationTime'] as int? ?? 10,
+        preparationTime: json['prepTime'] as int? ??
+            json['preparationTime'] as int? ??
+            10,
       );
 
   Map<String, dynamic> toJson() => {
@@ -44,12 +49,12 @@ class MenuItem {
         'name': name,
         'description': description,
         'price': price,
-        'imageUrl': imageUrl,
+        'image': imageUrl,
         'category': category,
         'isVeg': isVeg,
         'isEgg': isEgg,
         'isAvailable': isAvailable,
         'rating': rating,
-        'preparationTime': preparationTime,
+        'prepTime': preparationTime,
       };
 }

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:student_app/data/models/order.dart';
-import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
 class OrderSuccessScreen extends StatefulWidget {
-  const OrderSuccessScreen({super.key});
+  final Order? order;
+
+  const OrderSuccessScreen({super.key, this.order});
 
   @override
   State<OrderSuccessScreen> createState() => _OrderSuccessScreenState();
@@ -30,137 +32,145 @@ class _OrderSuccessScreenState extends State<OrderSuccessScreen>
     super.dispose();
   }
 
+  void _goHome({int? tabIndex}) {
+    if (tabIndex == 2) {
+      context.go('/queue');
+    } else {
+      context.go('/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final order = ModalRoute.of(context)!.settings.arguments as Order?;
+    final order = widget.order;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              const Spacer(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _goHome(tabIndex: 0);
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Spacer(),
 
-              // Success animation
-              AnimatedBuilder(
-                animation: _pulseController,
-                builder: (context, child) => Transform.scale(
-                  scale: 1.0 + (_pulseController.value * 0.05),
-                  child: child,
-                ),
-                child: Container(
-                  width: 130,
-                  height: 130,
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) => Transform.scale(
+                    scale: 1.0 + (_pulseController.value * 0.05),
+                    child: child,
+                  ),
+                  child: Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.primaryGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primary.withValues(alpha: 0.4),
+                          blurRadius: 30,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text('🎉', style: TextStyle(fontSize: 60)),
+                    ),
+                  ),
+                ).animate().scale(
+                      duration: 600.ms,
+                      curve: Curves.elasticOut,
+                    ),
+                const SizedBox(height: 32),
+
+                Text(
+                  'Order Placed!',
+                  style: theme.textTheme.displayMedium?.copyWith(fontSize: 30),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
+                const SizedBox(height: 8),
+                Text(
+                  'Your food is on its way to the kitchen 🍳',
+                  style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
+                  textAlign: TextAlign.center,
+                ).animate().fadeIn(delay: 400.ms),
+
+                const SizedBox(height: 32),
+
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                    shape: BoxShape.circle,
+                    color: theme.cardTheme.color,
+                    borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.4),
-                        blurRadius: 30,
-                        spreadRadius: 5,
-                      ),
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 15,
+                      )
                     ],
                   ),
-                  child: const Center(
-                    child: Text('🎉', style: TextStyle(fontSize: 60)),
-                  ),
-                ),
-              ).animate().scale(
-                    duration: 600.ms,
-                    curve: Curves.elasticOut,
-                  ),
-              const SizedBox(height: 32),
-
-              Text(
-                'Order Placed!',
-                style: theme.textTheme.displayMedium?.copyWith(fontSize: 30),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3),
-              const SizedBox(height: 8),
-              Text(
-                'Your food is on its way to the kitchen 🍳',
-                style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14),
-                textAlign: TextAlign.center,
-              ).animate().fadeIn(delay: 400.ms),
-
-              const SizedBox(height: 32),
-
-              // Order details card
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 15,
-                    )
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    _detailRow(context, '🧾 Order ID', order?.id ?? '-'),
-                    const Divider(height: 20),
-                    Builder(
-                      builder: (ctx) {
-                        String etaLabel = '⏱️ Est. Time';
-                        String etaValue = '${order?.estimatedMinutes ?? 12} minutes';
-                        if (order?.selectedSlot != null) {
-                          final slot = order!.selectedSlot!;
-                          final now = DateTime.now();
-                          final diff = slot.startTime.difference(now).inMinutes;
-                          // Show ETA only if slot is within ~60 minutes
-                          if (diff > 60) {
-                            etaLabel = '🗓️ Pickup Slot';
-                            etaValue = slot.label;
+                  child: Column(
+                    children: [
+                      _detailRow(context, '🧾 Order ID', order?.id ?? '-'),
+                      const Divider(height: 20),
+                      Builder(
+                        builder: (ctx) {
+                          String etaLabel = '⏱️ Est. Time';
+                          String etaValue = '${order?.estimatedMinutes ?? 12} minutes';
+                          if (order?.selectedSlot != null) {
+                            final slot = order!.selectedSlot!;
+                            final now = DateTime.now();
+                            final diff = slot.startTime.difference(now).inMinutes;
+                            if (diff > 60) {
+                              etaLabel = '🗓️ Pickup Slot';
+                              etaValue = slot.label;
+                            }
                           }
-                        }
-                        return _detailRow(context, etaLabel, etaValue);
-                      },
-                    ),
-                    const Divider(height: 20),
-                    _detailRow(context, '🔢 Queue',
-                        '#${order?.queuePosition ?? 5}'),
-                    const Divider(height: 20),
-                    _detailRow(context, '💳 Total',
-                        '₹${order?.totalAmount.toStringAsFixed(2) ?? '0.00'}',
-                        valueColor: AppColors.primary),
+                          return _detailRow(context, etaLabel, etaValue);
+                        },
+                      ),
+                      const Divider(height: 20),
+                      _detailRow(context, '🔢 Queue',
+                          '#${order?.queuePosition ?? 5}'),
+                      const Divider(height: 20),
+                      _detailRow(context, '💳 Total',
+                          '₹${order?.totalAmount.toStringAsFixed(2) ?? '0.00'}',
+                          valueColor: AppColors.primary),
+                    ],
+                  ),
+                ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.3),
+
+                const Spacer(),
+
+                Column(
+                  children: [
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _goHome(tabIndex: 2), // Queue tab
+                        icon: const Icon(Icons.queue_rounded),
+                        label: const Text('Track Order'),
+                      ),
+                    ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () => _goHome(tabIndex: 0), // Menu tab
+                        icon: const Icon(Icons.restaurant_menu_rounded),
+                        label: const Text('Back to Menu'),
+                      ),
+                    ).animate().fadeIn(delay: 800.ms),
                   ],
                 ),
-              ).animate().fadeIn(delay: 500.ms).slideY(begin: 0.3),
-
-              const Spacer(),
-
-              // CTA buttons
-              Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => Navigator.of(context)
-                          .pushReplacementNamed(AppConstants.homeRoute),
-                      icon: const Icon(Icons.queue_rounded),
-                      label: const Text('Track Order'),
-                    ),
-                  ).animate().fadeIn(delay: 700.ms).slideY(begin: 0.3),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context)
-                          .pushReplacementNamed(AppConstants.homeRoute),
-                      icon: const Icon(Icons.restaurant_menu_rounded),
-                      label: const Text('Back to Menu'),
-                    ),
-                  ).animate().fadeIn(delay: 800.ms),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

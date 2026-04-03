@@ -1,21 +1,46 @@
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/notification_model.dart';
 import 'package:student_app/data/services/notification_service.dart';
 
-class NotificationProvider extends ChangeNotifier {
-  final NotificationService _service = NotificationService();
+final notificationServiceProvider = Provider<NotificationService>((ref) => NotificationService());
 
-  List<NotificationModel> get notifications => _service.notifications;
-  int get unreadCount => _service.unreadCount;
+final notificationProvider = StateNotifierProvider<NotificationNotifier, NotificationState>((ref) {
+  return NotificationNotifier(ref.read(notificationServiceProvider));
+});
+
+class NotificationState {
+  final List<NotificationModel> notifications;
+  final int unreadCount;
+
+  NotificationState({
+    required this.notifications,
+    required this.unreadCount,
+  });
+}
+
+class NotificationNotifier extends StateNotifier<NotificationState> {
+  final NotificationService _service;
+
+  NotificationNotifier(this._service) : super(NotificationState(
+    notifications: _service.notifications,
+    unreadCount: _service.unreadCount,
+  ));
+
+  void _updateState() {
+    state = NotificationState(
+      notifications: List.from(_service.notifications),
+      unreadCount: _service.unreadCount,
+    );
+  }
 
   void markRead(String id) {
     _service.markAsRead(id);
-    notifyListeners();
+    _updateState();
   }
 
   void markAllRead() {
     _service.markAllAsRead();
-    notifyListeners();
+    _updateState();
   }
 
   void onOrderPlaced(String orderId) {
@@ -23,6 +48,6 @@ class NotificationProvider extends ChangeNotifier {
       orderId,
       'Your order $orderId has been placed! Estimated time: 12 mins.',
     );
-    notifyListeners();
+    _updateState();
   }
 }

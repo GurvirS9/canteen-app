@@ -1,38 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:student_app/data/models/time_slot.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/presentation/providers/notification_provider.dart';
-import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 import 'package:student_app/presentation/widgets/cart_item_tile.dart';
 import 'package:student_app/presentation/widgets/empty_state_widget.dart';
 
-class CartScreen extends StatelessWidget {
+class CartScreen extends ConsumerWidget {
   final bool showBackButton;
   const CartScreen({super.key, this.showBackButton = false});
 
   @override
-  Widget build(BuildContext context) {
-    final cart = context.watch<CartProvider>();
+  Widget build(BuildContext context, WidgetRef ref) {
+    final cartState = ref.watch(cartProvider);
+    final cartNotifier = ref.watch(cartProvider.notifier);
 
     return Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: showBackButton,
         title: const Text('My Cart'),
         actions: [
-          if (cart.itemCount > 0)
+          if (cartNotifier.itemCount > 0)
             TextButton.icon(
-              onPressed: () => _clearCart(context),
+              onPressed: () => _clearCart(context, ref),
               icon: const Icon(Icons.delete_sweep_outlined, size: 18),
               label: const Text('Clear'),
               style: TextButton.styleFrom(foregroundColor: AppColors.error),
             ),
         ],
       ),
-      body: cart.isEmpty
+      body: cartNotifier.isEmpty
           ? const EmptyStateWidget(
               icon: Icons.shopping_cart_outlined,
               title: 'Your cart is empty',
@@ -40,25 +41,23 @@ class CartScreen extends StatelessWidget {
             )
           : Column(
               children: [
-                // Item list
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    itemCount: cart.items.length,
+                    itemCount: cartState.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (ctx, i) => CartItemTile(
-                      cartItem: cart.items[i],
+                      cartItem: cartState[i],
                     ).animate().fadeIn(delay: (i * 60).ms).slideX(begin: 0.1),
                   ),
                 ),
-                // Price summary + CTA
-                _PriceSummaryPanel(cart: cart),
+                const _PriceSummaryPanel(),
               ],
             ),
     );
   }
 
-  void _clearCart(BuildContext context) {
+  void _clearCart(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -70,7 +69,7 @@ class CartScreen extends StatelessWidget {
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
-              context.read<CartProvider>().clearCart();
+              ref.read(cartProvider.notifier).clearCart();
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
@@ -82,14 +81,24 @@ class CartScreen extends StatelessWidget {
   }
 }
 
-class _PriceSummaryPanel extends StatelessWidget {
-  final CartProvider cart;
+class _PriceSummaryPanel extends ConsumerStatefulWidget {
+  const _PriceSummaryPanel();
 
-  const _PriceSummaryPanel({required this.cart});
+  @override
+  ConsumerState<_PriceSummaryPanel> createState() => _PriceSummaryPanelState();
+}
+
+class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
+  bool _isFetchingSlots = false;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cartNotifier = ref.watch(cartProvider.notifier);
+    // Since Subtotal/Tax/Total change when cart contents change, we need to observe the cartState
+    ref.watch(cartProvider);
+    final isPlacingOrder = ref.watch(orderProvider).isPlacingOrder;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       decoration: BoxDecoration(
@@ -106,7 +115,6 @@ class _PriceSummaryPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Drag handle
           Center(
             child: Container(
               width: 36,
@@ -120,23 +128,32 @@ class _PriceSummaryPanel extends StatelessWidget {
           const SizedBox(height: 16),
           Text('Price Details', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
-          _priceRow(context, 'Subtotal', '₹${cart.subtotal.toStringAsFixed(2)}'),
+          _priceRow(context, 'Subtotal', '₹${cartNotifier.subtotal.toStringAsFixed(2)}'),
           const SizedBox(height: 6),
-          _priceRow(context, 'GST (5%)', '₹${cart.tax.toStringAsFixed(2)}'),
+          _priceRow(context, 'GST (5%)', '₹${cartNotifier.tax.toStringAsFixed(2)}'),
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 10),
             child: Divider(),
           ),
-          _priceRow(context, 'Total Amount', '₹${cart.total.toStringAsFixed(2)}',
+          _priceRow(context, 'Total Amount', '₹${cartNotifier.total.toStringAsFixed(2)}',
               isBold: true),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _showSlotSelection(context),
-              icon: const Icon(Icons.restaurant_rounded, size: 20),
-              label: Text(
-                  'Place Order • ₹${cart.total.toStringAsFixed(2)}'),
+              onPressed: (isPlacingOrder || _isFetchingSlots) ? null : () => _showSlotSelection(),
+              icon: (isPlacingOrder || _isFetchingSlots)
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.restaurant_rounded, size: 20),
+              label: Text(isPlacingOrder
+                  ? 'Placing Order...'
+                  : _isFetchingSlots
+                      ? 'Loading Slots...'
+                      : 'Place Order • ₹${cartNotifier.total.toStringAsFixed(2)}'),
             ),
           ),
         ],
@@ -172,18 +189,18 @@ class _PriceSummaryPanel extends StatelessWidget {
     );
   }
 
-  Future<void> _showSlotSelection(BuildContext context) async {
-    final orderProvider = context.read<OrderProvider>();
+  Future<void> _showSlotSelection() async {
+    setState(() {
+      _isFetchingSlots = true;
+    });
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final slots = await orderProvider.getAvailableSlots();
-    if (!context.mounted) return;
-    Navigator.pop(context); // close loading
+    final orderNotifier = ref.read(orderProvider.notifier);
+    final slots = await orderNotifier.getAvailableSlots();
+    
+    if (!mounted) return;
+    setState(() {
+      _isFetchingSlots = false;
+    });
 
     if (slots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -199,29 +216,30 @@ class _PriceSummaryPanel extends StatelessWidget {
       builder: (ctx) => _SlotSelectionSheet(slots: slots),
     );
 
-    if (selectedSlot != null && context.mounted) {
-      _placeOrder(context, selectedSlot);
+    if (selectedSlot != null && mounted) {
+      _placeOrder(selectedSlot);
     }
   }
 
-  Future<void> _placeOrder(BuildContext context, TimeSlot selectedSlot) async {
-    final cart = context.read<CartProvider>();
-    final orderProvider = context.read<OrderProvider>();
-    final notifProvider = context.read<NotificationProvider>();
+  Future<void> _placeOrder(TimeSlot selectedSlot) async {
+    final cartItems = ref.read(cartProvider);
+    final cartNotifier = ref.read(cartProvider.notifier);
+    final orderNotifier = ref.read(orderProvider.notifier);
+    final notifNotifier = ref.read(notificationProvider.notifier);
 
-    final items = List.of(cart.items);
-    final order = await orderProvider.placeOrder(items, selectedSlot: selectedSlot);
-    if (!context.mounted) return;
+    final items = List.of(cartItems);
+    final order = await orderNotifier.placeOrder(items, selectedSlot: selectedSlot);
+    if (!mounted) return;
 
     if (order != null) {
-      notifProvider.onOrderPlaced(order.id);
-      cart.clearCart();
-      Navigator.of(context).pushNamed(AppConstants.orderSuccessRoute,
-          arguments: order);
+      notifNotifier.onOrderPlaced(order.id);
+      cartNotifier.clearCart();
+      context.push('/order-success', extra: order);
     } else {
+      final errorMsg = ref.read(orderProvider).error ?? 'Order failed. Try again.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(orderProvider.error ?? 'Order failed. Try again.'),
+          content: Text(errorMsg),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),

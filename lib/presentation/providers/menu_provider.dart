@@ -1,68 +1,104 @@
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/menu_item.dart';
 import 'package:student_app/data/services/api_service.dart';
 import 'package:student_app/core/constants/app_constants.dart';
+import 'package:student_app/core/utils/logger.dart';
 
 enum SortOption { bestsellers, priceLowToHigh, priceHighToLow, alphabetical }
 enum DietaryFilter { all, veg, egg, nonVeg }
 
-class MenuProvider extends ChangeNotifier {
-  final ApiService _apiService = ApiService();
+class MenuState {
+  final List<MenuItem> items;
+  final String selectedCategory;
+  final String searchQuery;
+  final SortOption selectedSort;
+  final DietaryFilter dietaryFilter;
+  final bool isLoading;
+  final String? error;
 
+  MenuState({
+    required this.items,
+    this.selectedCategory = 'All',
+    this.searchQuery = '',
+    this.selectedSort = SortOption.bestsellers,
+    this.dietaryFilter = DietaryFilter.all,
+    this.isLoading = false,
+    this.error,
+  });
+
+  MenuState copyWith({
+    List<MenuItem>? items,
+    String? selectedCategory,
+    String? searchQuery,
+    SortOption? selectedSort,
+    DietaryFilter? dietaryFilter,
+    bool? isLoading,
+    String? error,
+  }) {
+    return MenuState(
+      items: items ?? this.items,
+      selectedCategory: selectedCategory ?? this.selectedCategory,
+      searchQuery: searchQuery ?? this.searchQuery,
+      selectedSort: selectedSort ?? this.selectedSort,
+      dietaryFilter: dietaryFilter ?? this.dietaryFilter,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+    );
+  }
+}
+
+final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
+
+final menuProvider = StateNotifierProvider<MenuNotifier, MenuState>((ref) {
+  return MenuNotifier(ref.read(apiServiceProvider));
+});
+
+class MenuNotifier extends StateNotifier<MenuState> {
+  static const String _tag = 'MenuNotifier';
+  final ApiService _apiService;
   List<MenuItem> _allItems = [];
-  List<MenuItem> _filteredItems = [];
-  String _selectedCategory = AppConstants.categories.first;
-  String _searchQuery = '';
-  SortOption _selectedSort = SortOption.bestsellers;
-  DietaryFilter _dietaryFilter = DietaryFilter.all;
-  bool _isLoading = false;
-  String? _error;
 
-  List<MenuItem> get items => _filteredItems;
-  String get selectedCategory => _selectedCategory;
-  String get searchQuery => _searchQuery;
-  SortOption get selectedSort => _selectedSort;
-  DietaryFilter get dietaryFilter => _dietaryFilter;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  MenuNotifier(this._apiService) : super(MenuState(items: []));
 
   Future<void> fetchMenu() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
+    AppLogger.i(_tag, 'fetchMenu() started');
+    state = state.copyWith(isLoading: true, error: null);
+    final stopwatch = Stopwatch()..start();
     try {
       _allItems = await _apiService.getMenu();
+      stopwatch.stop();
+      AppLogger.i(_tag, 'fetchMenu() loaded ${_allItems.length} items in ${stopwatch.elapsedMilliseconds}ms');
       _applyFilters();
-    } catch (e) {
-      _error = 'Failed to load menu. Please try again.';
+    } catch (e, stack) {
+      stopwatch.stop();
+      state = state.copyWith(isLoading: false, error: 'Failed to load menu. Please try again.');
+      AppLogger.e(_tag, 'fetchMenu() FAILED', e, stack);
     }
-    _isLoading = false;
-    notifyListeners();
   }
 
   void selectCategory(String category) {
-    _selectedCategory = category;
+    AppLogger.d(_tag, 'selectCategory() → "$category"');
+    state = state.copyWith(selectedCategory: category);
     _applyFilters();
-    notifyListeners();
   }
 
   void search(String query) {
-    _searchQuery = query;
+    AppLogger.d(_tag, 'search() → "$query"');
+    state = state.copyWith(searchQuery: query);
     _applyFilters();
-    notifyListeners();
   }
 
   void _applyFilters() {
     var items = _allItems;
 
     // Category filter
-    if (_selectedCategory != AppConstants.categories.first) {
-      items = items.where((i) => i.category == _selectedCategory).toList();
+    if (state.selectedCategory != AppConstants.categories.first) {
+      items = items.where((i) => i.category == state.selectedCategory).toList();
     }
 
     // Search filter
-    if (_searchQuery.isNotEmpty) {
-      final q = _searchQuery.toLowerCase();
+    if (state.searchQuery.isNotEmpty) {
+      final q = state.searchQuery.toLowerCase();
       items = items.where((i) =>
           i.name.toLowerCase().contains(q) ||
           i.description.toLowerCase().contains(q) ||
@@ -70,18 +106,16 @@ class MenuProvider extends ChangeNotifier {
     }
 
     // Dietary filter
-    if (_dietaryFilter == DietaryFilter.veg) {
+    if (state.dietaryFilter == DietaryFilter.veg) {
       items = items.where((i) => i.isVeg).toList();
-    } else if (_dietaryFilter == DietaryFilter.egg) {
+    } else if (state.dietaryFilter == DietaryFilter.egg) {
       items = items.where((i) => i.isEgg).toList();
-    } else if (_dietaryFilter == DietaryFilter.nonVeg) {
-      // Non-veg usually means meat (not strictly veg and not strictly egg)
-      // We can define it as items where both isVeg and isEgg are false.
+    } else if (state.dietaryFilter == DietaryFilter.nonVeg) {
       items = items.where((i) => !i.isVeg && !i.isEgg).toList();
     }
 
     // Sort
-    switch (_selectedSort) {
+    switch (state.selectedSort) {
       case SortOption.priceLowToHigh:
         items.sort((a, b) => a.price.compareTo(b.price));
         break;
@@ -96,22 +130,23 @@ class MenuProvider extends ChangeNotifier {
         break;
     }
 
-    _filteredItems = items;
+    state = state.copyWith(items: items, isLoading: false);
+    AppLogger.d(_tag, '_applyFilters() → ${items.length} items');
   }
 
   void setSortOption(SortOption option) {
-    if (_selectedSort != option) {
-      _selectedSort = option;
+    if (state.selectedSort != option) {
+      AppLogger.d(_tag, 'setSortOption() → ${option.name}');
+      state = state.copyWith(selectedSort: option);
       _applyFilters();
-      notifyListeners();
     }
   }
 
   void setDietaryFilter(DietaryFilter filter) {
-    if (_dietaryFilter != filter) {
-      _dietaryFilter = filter;
+    if (state.dietaryFilter != filter) {
+      AppLogger.d(_tag, 'setDietaryFilter() → ${filter.name}');
+      state = state.copyWith(dietaryFilter: filter);
       _applyFilters();
-      notifyListeners();
     }
   }
 

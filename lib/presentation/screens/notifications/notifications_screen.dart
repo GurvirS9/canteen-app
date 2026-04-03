@@ -1,25 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/notification_model.dart';
 import 'package:student_app/presentation/providers/notification_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
-class NotificationsScreen extends StatelessWidget {
+class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final notifProvider = context.watch<NotificationProvider>();
-    final notifications = notifProvider.notifications;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final notifState = ref.watch(notificationProvider);
+    final notifNotifier = ref.read(notificationProvider.notifier);
+    final notifications = notifState.notifications;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Notifications'),
         actions: [
-          if (notifProvider.unreadCount > 0)
+          if (notifState.unreadCount > 0)
             TextButton(
-              onPressed: notifProvider.markAllRead,
+              onPressed: notifNotifier.markAllRead,
               child: const Text('Mark all read'),
             ),
         ],
@@ -53,18 +54,18 @@ class NotificationsScreen extends StatelessWidget {
   }
 }
 
-class _NotifTile extends StatelessWidget {
+class _NotifTile extends ConsumerWidget {
   final NotificationModel notif;
 
   const _NotifTile({required this.notif});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isOffer = notif.type == NotificationType.offer;
 
     return GestureDetector(
-      onTap: () => context.read<NotificationProvider>().markRead(notif.id),
+      onTap: () => ref.read(notificationProvider.notifier).markRead(notif.id),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(14),

@@ -1,20 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/data/models/cart_item.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
+import 'menu_item_image.dart';
 import 'veg_nonveg_badge.dart';
 import 'quantity_control.dart';
 
-class CartItemTile extends StatelessWidget {
+class CartItemTile extends ConsumerWidget {
   final CartItem cartItem;
 
   const CartItemTile({super.key, required this.cartItem});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final cart = context.read<CartProvider>();
+    final cartNotifier = ref.read(cartProvider.notifier);
 
     return Dismissible(
       key: Key(cartItem.menuItem.id),
@@ -39,7 +40,7 @@ class CartItemTile extends StatelessWidget {
           ],
         ),
       ),
-      onDismissed: (_) => cart.removeItemCompletely(cartItem.menuItem.id),
+      onDismissed: (_) => cartNotifier.removeItemCompletely(cartItem.menuItem.id),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -57,21 +58,16 @@ class CartItemTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Image
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
+            // Image with placeholder fallback
+            SizedBox(
+              width: 72,
+              height: 72,
+              child: MenuItemImage(
+                imageUrl: cartItem.menuItem.imageUrl,
+                itemName: cartItem.menuItem.name,
                 width: 72,
                 height: 72,
-                child: Image.network(
-                  cartItem.menuItem.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: const Color(0xFFF1F5F9),
-                    child: const Icon(Icons.fastfood_rounded,
-                        color: Color(0xFFCBD5E1)),
-                  ),
-                ),
+                borderRadius: BorderRadius.circular(10),
               ),
             ),
             const SizedBox(width: 12),
@@ -105,8 +101,8 @@ class CartItemTile extends StatelessWidget {
                       QuantityControl(
                         quantity: cartItem.quantity,
                         compact: true,
-                        onIncrement: () => cart.addItem(cartItem.menuItem),
-                        onDecrement: () => cart.removeItem(cartItem.menuItem),
+                        onIncrement: () => cartNotifier.addItem(cartItem.menuItem),
+                        onDecrement: () => cartNotifier.removeItem(cartItem.menuItem),
                       ),
                       const Spacer(),
                       Text(

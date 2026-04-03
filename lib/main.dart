@@ -1,53 +1,65 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:student_app/presentation/providers/auth_provider.dart';
-import 'package:student_app/presentation/providers/menu_provider.dart';
-import 'package:student_app/presentation/providers/cart_provider.dart';
-import 'package:student_app/presentation/providers/order_provider.dart';
-import 'package:student_app/presentation/providers/notification_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:student_app/presentation/providers/debug_provider.dart';
 import 'package:student_app/presentation/providers/theme_provider.dart';
-import 'package:student_app/presentation/screens/splash_screen.dart';
-import 'package:student_app/presentation/screens/auth/login_screen.dart';
-import 'package:student_app/presentation/screens/main_navigation.dart';
-import 'package:student_app/presentation/screens/cart/cart_screen.dart';
-import 'package:student_app/presentation/screens/order_success/order_success_screen.dart';
+import 'package:student_app/presentation/widgets/debug_overlay.dart';
 import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
+import 'package:student_app/core/utils/logger.dart';
+import 'package:student_app/core/router/router.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
-void main() {
-  runApp(const CampusEatsApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    // Disable app verification for testing to avoid emulator reCAPTCHA errors
+    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
+  } catch (e) {
+    AppLogger.e('Main', 'Failed to initialize Firebase: $e');
+  }
+  
+  runApp(const ProviderScope(child: CampusEatsApp()));
 }
 
-class CampusEatsApp extends StatelessWidget {
+class CampusEatsApp extends ConsumerStatefulWidget {
   const CampusEatsApp({super.key});
 
   @override
+  ConsumerState<CampusEatsApp> createState() => _CampusEatsAppState();
+}
+
+class _CampusEatsAppState extends ConsumerState<CampusEatsApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final debugNotifier = ref.read(debugProvider);
+      AppLogger.init(debugNotifier);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        ChangeNotifierProvider(create: (_) => MenuProvider()),
-        ChangeNotifierProvider(create: (_) => CartProvider()),
-        ChangeNotifierProvider(create: (_) => OrderProvider()),
-        ChangeNotifierProvider(create: (_) => NotificationProvider()),
-        ChangeNotifierProvider(create: (_) => ThemeProvider()),
-      ],
-      child: Consumer2<AuthProvider, ThemeProvider>(
-        builder: (ctx, auth, themeProvider, _) => MaterialApp(
-          title: AppConstants.appName,
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme(),
-          darkTheme: AppTheme.darkTheme(),
-          themeMode: themeProvider.themeMode,
-          initialRoute: AppConstants.splashRoute,
-          routes: {
-            AppConstants.splashRoute: (_) => const SplashScreen(),
-            AppConstants.loginRoute: (_) => const LoginScreen(),
-            AppConstants.homeRoute: (_) => const MainNavigationScreen(),
-            AppConstants.cartRoute: (_) => const CartScreen(showBackButton: true),
-            AppConstants.orderSuccessRoute: (_) => const OrderSuccessScreen(),
-          },
-        ),
+    final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
+    return MaterialApp.router(
+      title: AppConstants.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme(),
+      darkTheme: AppTheme.darkTheme(),
+      themeMode: themeMode,
+      routerConfig: router,
+      builder: (context, child) => Stack(
+        children: [
+          child!,
+          const DebugOverlay(),
+        ],
       ),
     );
   }

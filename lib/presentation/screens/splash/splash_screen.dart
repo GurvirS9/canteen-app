@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/presentation/providers/auth_provider.dart';
+import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   @override
   void initState() {
     super.initState();
@@ -20,14 +21,14 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkSession() async {
-    final auth = context.read<AuthProvider>();
-    await auth.checkSession();
+    await ref.read(authStateProvider.notifier).checkSession();
+    // After session is checked, router will automatically redirect.
+    // However, if user is logged in, initialize socket.
     if (!mounted) return;
-    await Future.delayed(const Duration(milliseconds: 2000));
-    if (!mounted) return;
-    Navigator.of(context).pushReplacementNamed(
-      auth.isLoggedIn ? AppConstants.homeRoute : AppConstants.loginRoute,
-    );
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user != null) {
+      ref.read(orderProvider.notifier).initSocket();
+    }
   }
 
   @override
