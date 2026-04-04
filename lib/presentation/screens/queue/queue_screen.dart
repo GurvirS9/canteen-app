@@ -174,17 +174,20 @@ class _OrderCard extends ConsumerWidget {
           builder: (context, constraints) {
             const double dotSize = 28;
             final double totalWidth = constraints.maxWidth;
-            final double spacing = (totalWidth - dotSize) / (statuses.length - 1);
+            final double inset = 16.0; // Inset to leave room for text
+            final double trackWidth = totalWidth - (inset * 2);
+            final double spacing = (trackWidth - dotSize) / (statuses.length - 1);
 
             return Column(
               children: [
                 SizedBox(
                   height: dotSize,
                   child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       for (int i = 0; i < statuses.length - 1; i++)
                         Positioned(
-                          left: (i * spacing) + dotSize,
+                          left: inset + (i * spacing) + dotSize,
                           top: dotSize / 2 - 1,
                           width: spacing - dotSize,
                           height: 2,
@@ -196,7 +199,7 @@ class _OrderCard extends ConsumerWidget {
                         ),
                       for (int i = 0; i < statuses.length; i++)
                         Positioned(
-                          left: i * spacing,
+                          left: inset + (i * spacing),
                           top: 0,
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 400),
@@ -236,12 +239,13 @@ class _OrderCard extends ConsumerWidget {
                 SizedBox(
                   height: 24,
                   child: Stack(
+                    clipBehavior: Clip.none,
                     children: [
                       for (int i = 0; i < statuses.length; i++)
                         Positioned(
-                          left: (i * spacing) + (dotSize / 2) - (spacing / 2),
+                          left: inset + (i * spacing) + (dotSize / 2) - 30,
                           top: 0,
-                          width: spacing,
+                          width: 60,
                           child: Text(
                             statuses[i].label,
                             textAlign: TextAlign.center,

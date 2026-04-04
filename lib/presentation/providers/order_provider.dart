@@ -58,6 +58,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   StreamSubscription<Map<String, dynamic>>? _orderUpdatedSub;
   StreamSubscription<Map<String, dynamic>>? _orderCreatedSub;
+  Timer? _pollingTimer;
 
   OrderNotifier(this._apiService, this._socketService) : super(OrderState(
     activeOrders: [],
@@ -68,6 +69,14 @@ class OrderNotifier extends StateNotifier<OrderState> {
     AppLogger.i(_tag, 'init()');
     await _connectSocket();
     await fetchActiveOrders();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer?.cancel();
+    _pollingTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      fetchActiveOrders();
+    });
   }
 
   Future<void> initSocket() => init();
@@ -213,6 +222,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
   }
 
   void disconnectSocket() {
+    _pollingTimer?.cancel();
     _orderUpdatedSub?.cancel();
     _orderCreatedSub?.cancel();
     _socketService.disconnect();
@@ -221,6 +231,7 @@ class OrderNotifier extends StateNotifier<OrderState> {
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _orderUpdatedSub?.cancel();
     _orderCreatedSub?.cancel();
     _socketService.disconnect();

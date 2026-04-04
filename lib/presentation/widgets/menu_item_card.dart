@@ -40,9 +40,7 @@ class _ImageCard extends ConsumerWidget {
     ref.watch(cartProvider);
     final qty = cartNotifier.quantityOf(item.id);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    Widget content = Container(
         decoration: BoxDecoration(
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(16),
@@ -195,7 +193,26 @@ class _ImageCard extends ConsumerWidget {
             ),
           ],
         ),
-      ),
+      );
+
+    if (!item.isAvailable) {
+      content = Opacity(
+        opacity: 0.6,
+        child: ColorFiltered(
+          colorFilter: const ColorFilter.matrix([
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0,      0,      0,      1, 0,
+          ]),
+          child: content,
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: item.isAvailable ? onTap : null,
+      child: content,
     );
   }
 }
@@ -216,9 +233,7 @@ class _CompactCard extends ConsumerWidget {
     ref.watch(cartProvider);
     final qty = cartNotifier.quantityOf(item.id);
 
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
+    Widget content = Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: theme.cardTheme.color,
@@ -355,7 +370,26 @@ class _CompactCard extends ConsumerWidget {
               ),
           ],
         ),
-      ),
+      );
+
+    if (!item.isAvailable) {
+      content = Opacity(
+        opacity: 0.6,
+        child: ColorFiltered(
+          colorFilter: const ColorFilter.matrix([
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0.2126, 0.7152, 0.0722, 0, 0,
+            0,      0,      0,      1, 0,
+          ]),
+          child: content,
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: item.isAvailable ? onTap : null,
+      child: content,
     );
   }
 }
