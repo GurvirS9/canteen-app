@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum OccupancyStatus { available, fillingFast, full }
+enum OccupancyStatus { available, fillingFast, full, closed }
 
 extension OccupancyStatusExtension on OccupancyStatus {
   String get label {
@@ -11,6 +11,8 @@ extension OccupancyStatusExtension on OccupancyStatus {
         return 'Filling Fast';
       case OccupancyStatus.full:
         return 'Full';
+      case OccupancyStatus.closed:
+        return 'Closed';
     }
   }
 
@@ -22,6 +24,8 @@ extension OccupancyStatusExtension on OccupancyStatus {
         return Colors.orange;
       case OccupancyStatus.full:
         return Colors.red;
+      case OccupancyStatus.closed:
+        return Colors.grey;
     }
   }
 }
@@ -39,7 +43,7 @@ class TimeSlot {
     required this.occupancy,
   });
 
-  bool get isAvailable => occupancy != OccupancyStatus.full;
+  bool get isAvailable => occupancy == OccupancyStatus.available || occupancy == OccupancyStatus.fillingFast;
 
   String get label {
     final startStr = _formatTime(startTime);
@@ -66,6 +70,9 @@ class TimeSlot {
         break;
       case 'full':
         occupancy = OccupancyStatus.full;
+        break;
+      case 'closed':
+        occupancy = OccupancyStatus.closed;
         break;
       default:
         occupancy = OccupancyStatus.available;
