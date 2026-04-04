@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/presentation/providers/auth_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/core/constants/app_constants.dart';
+import 'package:student_app/core/utils/logger.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
