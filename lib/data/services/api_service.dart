@@ -203,7 +203,7 @@ class ApiService {
     throw Exception('Failed to load orders (${response.statusCode})');
   }
 
-  /// GET /orders/active?userId=[uid] – Get active orders for current user
+  /// GET /orders/active – Get active orders for current user (identified by auth token)
   Future<List<Order>> getActiveOrders() async {
     AppLogger.i(_tag, 'getActiveOrders()');
     final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
@@ -211,7 +211,7 @@ class ApiService {
       AppLogger.w(_tag, 'getActiveOrders() no Firebase user, returning empty');
       return [];
     }
-    final response = await _get('${AppConstants.activeOrdersEndpoint}?userId=$uid');
+    final response = await _get(AppConstants.activeOrdersEndpoint);
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       final orders = data
@@ -224,17 +224,14 @@ class ApiService {
     throw Exception('Failed to load active orders (${response.statusCode})');
   }
 
-  /// POST /orders – Create a new order
+  /// POST /orders – Create a new order (user identified by auth token)
   Future<Order> postOrder(
     List<CartItem> items, {
     TimeSlot? selectedSlot,
-    String? userId,
   }) async {
     AppLogger.i(_tag,
         'postOrder() ${items.length} items | slot=${selectedSlot?.id ?? 'none'}');
-    final firebaseUid = userId ?? firebase.FirebaseAuth.instance.currentUser?.uid;
     final body = {
-      if (firebaseUid != null) 'userId': firebaseUid,
       'items': items
           .map((e) => ({
                 'menuItem': e.menuItem.id,
@@ -242,7 +239,6 @@ class ApiService {
               }))
           .toList(),
       'slotId': selectedSlot?.id ?? '',
-      'status': 'pending',
     };
     AppLogger.d(_tag, 'postOrder() REQUEST BODY: ${json.encode(body)}');
     final response = await _post(AppConstants.ordersEndpoint, body: body);

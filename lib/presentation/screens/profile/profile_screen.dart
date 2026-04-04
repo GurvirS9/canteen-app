@@ -277,7 +277,7 @@ class ProfileScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(order.id,
+                Text('Order #${order.shortId}',
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontSize: 13)),
                 Text(order.displaySummary,

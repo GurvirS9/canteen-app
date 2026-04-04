@@ -130,7 +130,7 @@ class _OrderCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Order ${order.id}',
+                  'Order #${order.shortId}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w700,

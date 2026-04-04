@@ -80,6 +80,12 @@ class Order {
     this.selectedSlot,
   });
 
+  /// Short ID for display (last 6 hex characters of MongoDB ObjectID)
+  String get shortId {
+    final raw = id.replaceAll('-', '');
+    return raw.length > 6 ? raw.substring(raw.length - 6).toUpperCase() : raw.toUpperCase();
+  }
+
   Order copyWith({
     OrderStatus? status,
     int? queuePosition,
@@ -107,42 +113,38 @@ class Order {
     // Parse items array from backend (each has menuItem object or string + quantity)
     final rawItems = json['items'] as List<dynamic>? ?? [];
     final itemNames = <String>[];
+    double calculatedTotal = 0.0;
+
     for (final e in rawItems) {
       if (e is Map) {
         final menuItem = e['menuItem'];
+        final qty = (e['quantity'] as num?)?.toInt() ?? 1;
         if (menuItem is Map) {
           final name = menuItem['name']?.toString() ?? '';
-          final qty = e['quantity'] ?? 1;
+          final price = (menuItem['price'] as num?)?.toDouble() ?? 0.0;
           if (name.isNotEmpty) {
             itemNames.add('${qty}x $name');
           }
+          calculatedTotal += price * qty;
         } else if (menuItem is String && menuItem.isNotEmpty) {
           itemNames.add(menuItem);
         }
       }
     }
-    // Also handle backend's formatted items string (from getOrders)
-    final formattedItems = json['items'];
+
+    // Prefer the backend-calculated totalAmount, fall back to calculated from items
+    double totalAmount = (json['totalAmount'] as num?)?.toDouble() ?? 0.0;
+    if (totalAmount == 0.0 && calculatedTotal > 0.0) {
+      totalAmount = calculatedTotal;
+    }
+
+    // Build items summary
     String? itemsSummaryStr;
+    final formattedItems = json['itemsSummary'];
     if (formattedItems is String && formattedItems.isNotEmpty) {
       itemsSummaryStr = formattedItems;
     } else if (itemNames.isNotEmpty) {
       itemsSummaryStr = itemNames.join(', ');
-    }
-
-    // Parse totalAmount from items if not provided
-    double totalAmount = (json['totalAmount'] as num?)?.toDouble() ?? 0.0;
-    if (totalAmount == 0.0 && rawItems.isNotEmpty) {
-      for (final e in rawItems) {
-        if (e is Map) {
-          final menuItem = e['menuItem'];
-          final qty = (e['quantity'] as num?)?.toInt() ?? 1;
-          if (menuItem is Map) {
-            final price = (menuItem['price'] as num?)?.toDouble() ?? 0.0;
-            totalAmount += price * qty;
-          }
-        }
-      }
     }
 
     return Order(
