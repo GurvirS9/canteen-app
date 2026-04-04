@@ -55,12 +55,18 @@ class _CampusEatsAppState extends ConsumerState<CampusEatsApp> {
       darkTheme: AppTheme.darkTheme(),
       themeMode: themeMode,
       routerConfig: router,
-      builder: (context, child) => Stack(
-        children: [
-          child!,
-          const DebugOverlay(),
-        ],
-      ),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Container(
+          color: isDark ? AppColors.backgroundDark : AppColors.primary,
+          child: Stack(
+            children: [
+              if (child != null) child else const SizedBox.shrink(),
+              const DebugOverlay(),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -21,21 +21,44 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkSession() async {
-    await ref.read(authStateProvider.notifier).checkSession();
-    // After session is checked, router will automatically redirect.
-    // However, if user is logged in, initialize socket.
-    if (!mounted) return;
-    final user = ref.read(authStateProvider).valueOrNull;
-    if (user != null) {
-      ref.read(orderProvider.notifier).initSocket();
+    AppLogger.i('SplashScreen', 'Starting session check with 3s timeout');
+    
+    try {
+      // Artificial delay to ensure splash is visible and not just a black flash
+      await Future.delayed(const Duration(seconds: 1));
+      
+      if (!mounted) return;
+      
+      // Use wait with a 3-second timeout
+      await ref.read(authStateProvider.notifier).checkSession().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          AppLogger.w('SplashScreen', 'Session check timed out after 3s');
+        },
+      );
+      
+      AppLogger.i('SplashScreen', 'Session check completed');
+      
+      if (!mounted) return;
+      final user = ref.read(authStateProvider).valueOrNull;
+      if (user != null) {
+        ref.read(orderProvider.notifier).initSocket();
+      }
+    } catch (e) {
+      AppLogger.e('SplashScreen', 'Error during session check: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
+      backgroundColor: isDark ? const Color(0xFF121212) : AppColors.primary,
       body: Container(
-        decoration: const BoxDecoration(gradient: AppColors.heroGradient),
+        decoration: BoxDecoration(
+          gradient: isDark ? AppColors.darkHeroGradient : AppColors.heroGradient,
+        ),
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
