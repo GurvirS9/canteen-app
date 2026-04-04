@@ -54,6 +54,12 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String canteenName = 'Main Canteen';
 
+  // Auth
+  /// Dev bypass key accepted by the backend's auth middleware.
+  /// Used as fallback when Firebase token is unavailable.
+  /// ⚠️ Development/testing only — do NOT ship in production without gating.
+  static const String devAuthKey = 'swagger-local-dev-2024';
+
   // Timing
   static const int shimmerDuration = 1500;
   static const int apiTimeout = 30;

@@ -30,12 +30,28 @@ class ApiService {
   Uri _uri(String endpoint) =>
       Uri.parse('${AppConstants.baseUrl}$endpoint');
 
+  /// Build headers with Content-Type and Firebase Auth token.
+  /// Tries a force-refreshed Firebase ID token first; falls back to the
+  /// backend's dev-bypass key if no user is signed in.
   Future<Map<String, String>> _headers() async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     try {
-      final token = await firebase.FirebaseAuth.instance.currentUser?.getIdToken();
-      if (token != null) headers['Authorization'] = 'Bearer $token';
-    } catch (_) {}
+      final user = firebase.FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        // forceRefresh: true ensures we never send an expired token
+        final token = await user.getIdToken(true);
+        if (token != null && token.isNotEmpty) {
+          headers['Authorization'] = 'Bearer $token';
+          AppLogger.d(_tag, '_headers() Firebase token attached (force-refreshed)');
+          return headers;
+        }
+      }
+    } catch (e) {
+      AppLogger.w(_tag, '_headers() Firebase token failed: $e — falling back to dev key');
+    }
+    // Fallback: use the backend's Swagger dev-key bypass (dev/test only)
+    headers['Authorization'] = 'Bearer ${AppConstants.devAuthKey}';
+    AppLogger.w(_tag, '_headers() Using dev auth key fallback');
     return headers;
   }
 
@@ -220,10 +236,10 @@ class ApiService {
     final body = {
       if (firebaseUid != null) 'userId': firebaseUid,
       'items': items
-          .map((e) => {
+          .map((e) => ({
                 'menuItem': e.menuItem.id,
                 'quantity': e.quantity,
-              })
+              }))
           .toList(),
       'slotId': selectedSlot?.id ?? '',
       'status': 'pending',

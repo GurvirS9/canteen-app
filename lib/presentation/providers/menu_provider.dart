@@ -130,8 +130,13 @@ class MenuNotifier extends StateNotifier<MenuState> {
         break;
     }
 
+    // Stable sort: items with images first, then text-only
+    final withImage = items.where((i) => i.imageUrl.isNotEmpty).toList();
+    final withoutImage = items.where((i) => i.imageUrl.isEmpty).toList();
+    items = [...withImage, ...withoutImage];
+
     state = state.copyWith(items: items, isLoading: false);
-    AppLogger.d(_tag, '_applyFilters() → ${items.length} items');
+    AppLogger.d(_tag, '_applyFilters() → ${items.length} items (${withImage.length} with image, ${withoutImage.length} text-only)');
   }
 
   void setSortOption(SortOption option) {

@@ -286,49 +286,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
 
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-              sliver: menuState.isLoading
-                  ? const SliverToBoxAdapter(child: ShimmerLoader())
-                  : menuState.error != null
-                      ? SliverToBoxAdapter(
-                          child: EmptyStateWidget(
-                            icon: Icons.wifi_off_rounded,
-                            title: 'Oops!',
-                            subtitle: menuState.error!,
-                            actionLabel: 'Retry',
-                            onAction: menuNotifier.fetchMenu,
-                          ),
-                        )
-                      : menuState.items.isEmpty
-                          ? SliverToBoxAdapter(
-                              child: EmptyStateWidget(
-                                icon: Icons.search_off_rounded,
-                                title: 'No items found',
-                                subtitle:
-                                    'Try a different search or category.',
-                                actionLabel: 'Clear Search',
-                                onAction: () {
-                                  _searchController.clear();
-                                  menuNotifier.search('');
-                                  menuNotifier.selectCategory(AppConstants.categories.first);
-                                },
-                              ),
-                            )
-                          : SliverGrid(
-                              delegate: SliverChildBuilderDelegate(
-                                (ctx, i) => MenuItemCard(item: menuState.items[i]),
-                                childCount: menuState.items.length,
-                              ),
-                              gridDelegate:
-                                  const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 2,
-                                childAspectRatio: 0.62,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                            ),
-            ),
+            // Menu items — split into image grid + text-only list
+            if (menuState.isLoading)
+              const SliverPadding(
+                padding: EdgeInsets.fromLTRB(16, 12, 16, 100),
+                sliver: SliverToBoxAdapter(child: ShimmerLoader()),
+              )
+            else if (menuState.error != null)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                sliver: SliverToBoxAdapter(
+                  child: EmptyStateWidget(
+                    icon: Icons.wifi_off_rounded,
+                    title: 'Oops!',
+                    subtitle: menuState.error!,
+                    actionLabel: 'Retry',
+                    onAction: menuNotifier.fetchMenu,
+                  ),
+                ),
+              )
+            else if (menuState.items.isEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                sliver: SliverToBoxAdapter(
+                  child: EmptyStateWidget(
+                    icon: Icons.search_off_rounded,
+                    title: 'No items found',
+                    subtitle: 'Try a different search or category.',
+                    actionLabel: 'Clear Search',
+                    onAction: () {
+                      _searchController.clear();
+                      menuNotifier.search('');
+                      menuNotifier.selectCategory(AppConstants.categories.first);
+                    },
+                  ),
+                ),
+              )
+            else ...[
+              // Items WITH images → 2-column grid
+              if (menuState.items.any((i) => i.imageUrl.isNotEmpty))
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  sliver: SliverGrid(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) {
+                        final imageItems = menuState.items
+                            .where((item) => item.imageUrl.isNotEmpty)
+                            .toList();
+                        return MenuItemCard(item: imageItems[i]);
+                      },
+                      childCount: menuState.items
+                          .where((i) => i.imageUrl.isNotEmpty)
+                          .length,
+                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 0.62,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                    ),
+                  ),
+                ),
+
+              // Items WITHOUT images → compact horizontal list
+              if (menuState.items.any((i) => i.imageUrl.isEmpty))
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) {
+                        final textItems = menuState.items
+                            .where((item) => item.imageUrl.isEmpty)
+                            .toList();
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: MenuItemCard(item: textItems[i]),
+                        );
+                      },
+                      childCount: menuState.items
+                          .where((i) => i.imageUrl.isEmpty)
+                          .length,
+                    ),
+                  ),
+                )
+              else
+                // Bottom padding when there are no text-only items
+                const SliverPadding(
+                  padding: EdgeInsets.only(bottom: 100),
+                  sliver: SliverToBoxAdapter(child: SizedBox.shrink()),
+                ),
+            ],
           ],
         ),
       ),
