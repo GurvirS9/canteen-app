@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:student_app/presentation/providers/menu_provider.dart';
 import 'package:student_app/presentation/providers/auth_provider.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
+import 'package:student_app/presentation/providers/shop_provider.dart';
 import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 import 'package:student_app/presentation/widgets/menu_item_card.dart';
@@ -24,6 +25,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shopState = ref.read(shopProvider);
+      if (shopState.selectedShop == null) {
+        context.go('/shops');
+        return;
+      }
       ref.read(menuProvider.notifier).fetchMenu();
     });
   }
@@ -41,6 +47,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     
     final authState = ref.watch(authStateProvider);
     final user = authState.valueOrNull;
+    
+    final shopState = ref.watch(shopProvider);
+    final selectedShop = shopState.selectedShop;
     
     final cartNotifier = ref.watch(cartProvider.notifier);
     // Observe cart to update totals
@@ -97,13 +106,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 2),
-                                  const Text(
-                                    'What are you craving today?',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
+                                  if (selectedShop != null)
+                                    GestureDetector(
+                                      onTap: () => context.go('/shops'),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.store_rounded,
+                                              color: Colors.white70, size: 14),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            selectedShop.name,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                              decoration: TextDecoration.underline,
+                                              decorationColor: Colors.white70,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.swap_horiz_rounded,
+                                              color: Colors.white54, size: 12),
+                                        ],
+                                      ),
+                                    )
+                                  else
+                                    const Text(
+                                      'What are you craving today?',
+                                      style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
                               const Spacer(),

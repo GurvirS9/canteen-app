@@ -89,6 +89,10 @@ class ApiService {
     }
   }
 
+  /// Public wrapper around [_get] — allows other services to re-use the
+  /// Firebase-auth + SSL-bypass HTTP client without duplicating logic.
+  Future<http.Response> getEndpoint(String endpoint) => _get(endpoint);
+
   /// Shared POST helper
   Future<http.Response> _post(String endpoint,
       {Map<String, dynamic>? body}) async {
@@ -153,10 +157,13 @@ class ApiService {
 
   // ─── Slots ─────────────────────────────────────────────────────────
 
-  /// GET /slots – Get all time slots
-  Future<List<TimeSlot>> getTimeSlots() async {
-    AppLogger.i(_tag, 'getTimeSlots()');
-    final response = await _get(AppConstants.slotsEndpoint);
+  /// GET /slots – Get all time slots, optionally filtered by shopId
+  Future<List<TimeSlot>> getTimeSlots({String? shopId}) async {
+    AppLogger.i(_tag, 'getTimeSlots() shopId=${shopId ?? 'all'}');
+    final endpoint = shopId != null
+        ? '${AppConstants.slotsEndpoint}?shopId=$shopId'
+        : AppConstants.slotsEndpoint;
+    final response = await _get(endpoint);
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       final slots = data
@@ -227,11 +234,14 @@ class ApiService {
   /// POST /orders – Create a new order (user identified by auth token)
   Future<Order> postOrder(
     List<CartItem> items, {
+    required String shopId,
     TimeSlot? selectedSlot,
+    String paymentMethod = 'upi',
   }) async {
     AppLogger.i(_tag,
-        'postOrder() ${items.length} items | slot=${selectedSlot?.id ?? 'none'}');
+        'postOrder() ${items.length} items | shop=$shopId | slot=${selectedSlot?.id ?? 'none'} | payment=$paymentMethod');
     final body = {
+      'shopId': shopId,
       'items': items
           .map((e) => ({
                 'menuItem': e.menuItem.id,
@@ -239,6 +249,8 @@ class ApiService {
               }))
           .toList(),
       'slotId': selectedSlot?.id ?? '',
+      'paymentMethod': paymentMethod,
+      'status': 'pending',
     };
     AppLogger.d(_tag, 'postOrder() REQUEST BODY: ${json.encode(body)}');
     final response = await _post(AppConstants.ordersEndpoint, body: body);

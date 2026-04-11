@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:student_app/data/models/order.dart';
 import 'package:student_app/data/models/time_slot.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
 import 'package:student_app/presentation/providers/notification_provider.dart';
+import 'package:student_app/presentation/providers/shop_provider.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 import 'package:student_app/presentation/widgets/cart_item_tile.dart';
 import 'package:student_app/presentation/widgets/empty_state_widget.dart';
@@ -44,10 +46,10 @@ class CartScreen extends ConsumerWidget {
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    itemCount: cartState.length,
+                    itemCount: cartState.items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (ctx, i) => CartItemTile(
-                      cartItem: cartState[i],
+                      cartItem: cartState.items[i],
                     ).animate().fadeIn(delay: (i * 60).ms).slideX(begin: 0.1),
                   ),
                 ),
@@ -90,6 +92,7 @@ class _PriceSummaryPanel extends ConsumerStatefulWidget {
 
 class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
   bool _isFetchingSlots = false;
+  PaymentMethod _selectedPaymentMethod = PaymentMethod.upi;
 
   @override
   Widget build(BuildContext context) {
@@ -98,6 +101,8 @@ class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
     // Since Subtotal/Tax/Total change when cart contents change, we need to observe the cartState
     ref.watch(cartProvider);
     final isPlacingOrder = ref.watch(orderProvider).isPlacingOrder;
+    final shopState = ref.watch(shopProvider);
+    final selectedShop = shopState.selectedShop;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -138,6 +143,36 @@ class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
           _priceRow(context, 'Total Amount', '₹${cartNotifier.total.toStringAsFixed(2)}',
               isBold: true),
           const SizedBox(height: 16),
+          // Shop context
+          if (selectedShop != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.store_rounded, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ordering from: ${selectedShop.name}',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          // Payment method selector
+          Text('Payment Method', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 8),
+          _PaymentMethodSelector(
+            selected: _selectedPaymentMethod,
+            onChanged: (m) => setState(() => _selectedPaymentMethod = m),
+          ),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -194,8 +229,10 @@ class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
       _isFetchingSlots = true;
     });
 
+    final shopState = ref.read(shopProvider);
+    final shopId = shopState.selectedShop?.id;
     final orderNotifier = ref.read(orderProvider.notifier);
-    final slots = await orderNotifier.getAvailableSlots();
+    final slots = await orderNotifier.getAvailableSlots(shopId: shopId);
     
     if (!mounted) return;
     setState(() {
@@ -222,13 +259,20 @@ class _PriceSummaryPanelState extends ConsumerState<_PriceSummaryPanel> {
   }
 
   Future<void> _placeOrder(TimeSlot selectedSlot) async {
-    final cartItems = ref.read(cartProvider);
+    final cartItems = ref.read(cartProvider).items;
     final cartNotifier = ref.read(cartProvider.notifier);
     final orderNotifier = ref.read(orderProvider.notifier);
     final notifNotifier = ref.read(notificationProvider.notifier);
+    final shopState = ref.read(shopProvider);
+    final shopId = shopState.selectedShop?.id ?? '';
 
     final items = List.of(cartItems);
-    final order = await orderNotifier.placeOrder(items, selectedSlot: selectedSlot);
+    final order = await orderNotifier.placeOrder(
+      items,
+      selectedSlot: selectedSlot,
+      shopId: shopId,
+      paymentMethod: _selectedPaymentMethod.name,
+    );
     if (!mounted) return;
 
     if (order != null) {
@@ -336,6 +380,57 @@ class _SlotSelectionSheetState extends State<_SlotSelectionSheet> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PaymentMethodSelector extends StatelessWidget {
+  final PaymentMethod selected;
+  final ValueChanged<PaymentMethod> onChanged;
+
+  const _PaymentMethodSelector({required this.selected, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: PaymentMethod.values.map((method) {
+        final isSelected = selected == method;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => onChanged(method),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : theme.chipTheme.backgroundColor,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : Colors.transparent,
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(method.emoji, style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 2),
+                  Text(
+                    method.label,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected ? AppColors.primary : theme.hintColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

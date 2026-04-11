@@ -136,19 +136,29 @@ class OrderNotifier extends StateNotifier<OrderState> {
     state = state.copyWith(activeOrders: newActive, orderHistory: newHistory);
   }
 
-  Future<List<TimeSlot>> getAvailableSlots() async {
+  Future<List<TimeSlot>> getAvailableSlots({String? shopId}) async {
     try {
-      return await _apiService.getTimeSlots();
+      return await _apiService.getTimeSlots(shopId: shopId);
     } catch (e, stack) {
       AppLogger.e(_tag, 'getAvailableSlots() FAILED', e, stack);
       return [];
     }
   }
 
-  Future<Order?> placeOrder(List<CartItem> items, {TimeSlot? selectedSlot}) async {
+  Future<Order?> placeOrder(
+    List<CartItem> items, {
+    TimeSlot? selectedSlot,
+    required String shopId,
+    String paymentMethod = 'upi',
+  }) async {
     state = state.copyWith(isPlacingOrder: true, error: null);
     try {
-      final serverOrder = await _apiService.postOrder(items, selectedSlot: selectedSlot);
+      final serverOrder = await _apiService.postOrder(
+        items,
+        shopId: shopId,
+        selectedSlot: selectedSlot,
+        paymentMethod: paymentMethod,
+      );
 
       final total = items.fold<double>(0, (sum, e) => sum + e.total);
 
@@ -168,6 +178,8 @@ class OrderNotifier extends StateNotifier<OrderState> {
         estimatedMinutes: estimation,
         queuePosition: serverOrder.queuePosition > 0 ? serverOrder.queuePosition : 1,
         selectedSlot: selectedSlot,
+        shopId: shopId,
+        paymentMethod: serverOrder.paymentMethod,
       );
 
       final newActive = List<Order>.from(state.activeOrders)..insert(0, newOrder);

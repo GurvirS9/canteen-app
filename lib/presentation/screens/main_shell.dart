@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:student_app/presentation/providers/cart_provider.dart';
 import 'package:student_app/presentation/providers/notification_provider.dart';
 import 'package:student_app/presentation/providers/order_provider.dart';
+import 'package:student_app/presentation/providers/shop_provider.dart';
 import 'package:student_app/presentation/widgets/active_order_banner.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 
@@ -25,14 +26,16 @@ class MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<MainShell> {
   @override
   Widget build(BuildContext context) {
-    // We cannot use watch(provider.notifier).itemCount since itemcount is computed and not reactive via notifier alone if state doesn't change, wait we should watch the provider.
     final cartState = ref.watch(cartProvider);
-    final currentCartCount = cartState.fold<int>(0, (sum, e) => sum + e.quantity);
+    final currentCartCount = cartState.items.fold<int>(0, (sum, e) => sum + e.quantity);
     
     final notifState = ref.watch(notificationProvider);
     final orderState = ref.watch(orderProvider);
+    final shopState = ref.watch(shopProvider);
+    final selectedShopName = shopState.selectedShop?.name;
     
-    final showBanner = widget.currentIndex != 2 && orderState.hasActiveOrder;
+    // Banner shown on all tabs except the Queue tab (index 3)
+    final showBanner = widget.currentIndex != 3 && orderState.hasActiveOrder;
 
     return Scaffold(
       body: Column(
@@ -55,6 +58,11 @@ class _MainShellState extends ConsumerState<MainShell> {
           currentIndex: widget.currentIndex,
           onTap: widget.onTabChanged,
           items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.store_outlined),
+              activeIcon: const Icon(Icons.store_rounded),
+              label: selectedShopName != null ? selectedShopName.split(' ').first : 'Shops',
+            ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.restaurant_menu_outlined),
               activeIcon: Icon(Icons.restaurant_menu_rounded),

@@ -35,12 +35,14 @@ class TimeSlot {
   final DateTime startTime;
   final DateTime endTime;
   final OccupancyStatus occupancy;
+  final String? shopId;
 
   TimeSlot({
     this.id,
     required this.startTime,
     required this.endTime,
     required this.occupancy,
+    this.shopId,
   });
 
   bool get isAvailable => occupancy == OccupancyStatus.available || occupancy == OccupancyStatus.fillingFast;
@@ -83,6 +85,7 @@ class TimeSlot {
       startTime: _parseTime(json['startTime'] as String),
       endTime: _parseTime(json['endTime'] as String),
       occupancy: occupancy,
+      shopId: (json['shopId'] is String) ? json['shopId'] as String : (json['shopId'] is Map ? (json['shopId']['_id'] ?? json['shopId']['id'])?.toString() : null),
     );
   }
 
@@ -105,5 +108,6 @@ class TimeSlot {
         'startTime': startTime.toIso8601String(),
         'endTime': endTime.toIso8601String(),
         'occupancy': occupancy.name,
+        if (shopId != null) 'shopId': shopId,
       };
 }

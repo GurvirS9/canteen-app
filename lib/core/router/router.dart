@@ -7,6 +7,7 @@ import 'package:student_app/presentation/screens/auth/login_screen.dart';
 import 'package:student_app/presentation/screens/auth/signup_screen.dart';
 import 'package:student_app/presentation/screens/auth/forgot_password_screen.dart';
 import 'package:student_app/presentation/screens/main_shell.dart';
+import 'package:student_app/presentation/screens/shops/shop_list_screen.dart';
 import 'package:student_app/presentation/screens/home/home_screen.dart';
 import 'package:student_app/presentation/screens/cart/cart_screen.dart';
 import 'package:student_app/presentation/screens/queue/queue_screen.dart';
@@ -45,7 +46,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isSplashRoute = state.matchedLocation == '/';
 
       if (!isLoggedIn && !isAuthRoute) return '/login';
-      if (isLoggedIn && (isAuthRoute || isSplashRoute)) return '/home';
+      if (isLoggedIn && (isAuthRoute || isSplashRoute)) return '/shops';
       return null;
     },
     routes: [
@@ -72,6 +73,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
+          GoRoute(
+            path: '/shops',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: ShopListScreen()),
+          ),
           GoRoute(
             path: '/home',
             pageBuilder: (context, state) =>
@@ -104,27 +110,30 @@ final routerProvider = Provider<GoRouter>((ref) {
 });
 
 int _indexFromLocation(String location) {
-  if (location.startsWith('/home')) return 0;
-  if (location.startsWith('/cart')) return 1;
-  if (location.startsWith('/queue')) return 2;
-  if (location.startsWith('/notifications')) return 3;
-  if (location.startsWith('/profile')) return 4;
+  if (location.startsWith('/shops')) return 0;
+  if (location.startsWith('/home')) return 1;
+  if (location.startsWith('/cart')) return 2;
+  if (location.startsWith('/queue')) return 3;
+  if (location.startsWith('/notifications')) return 4;
+  if (location.startsWith('/profile')) return 5;
   return 0;
 }
 
 String _locationFromIndex(int index) {
   switch (index) {
     case 0:
-      return '/home';
+      return '/shops';
     case 1:
-      return '/cart';
+      return '/home';
     case 2:
-      return '/queue';
+      return '/cart';
     case 3:
-      return '/notifications';
+      return '/queue';
     case 4:
+      return '/notifications';
+    case 5:
       return '/profile';
     default:
-      return '/home';
+      return '/shops';
   }
 }

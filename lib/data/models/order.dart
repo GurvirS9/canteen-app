@@ -1,6 +1,50 @@
 import 'cart_item.dart';
 import 'time_slot.dart';
 
+enum PaymentMethod { cash, card, upi, wallet }
+
+extension PaymentMethodExtension on PaymentMethod {
+  String get label {
+    switch (this) {
+      case PaymentMethod.cash:
+        return 'Cash';
+      case PaymentMethod.card:
+        return 'Card';
+      case PaymentMethod.upi:
+        return 'UPI';
+      case PaymentMethod.wallet:
+        return 'Wallet';
+    }
+  }
+
+  String get emoji {
+    switch (this) {
+      case PaymentMethod.cash:
+        return '💵';
+      case PaymentMethod.card:
+        return '💳';
+      case PaymentMethod.upi:
+        return '📱';
+      case PaymentMethod.wallet:
+        return '👜';
+    }
+  }
+}
+
+PaymentMethod _parsePaymentMethod(String? value) {
+  switch (value?.toLowerCase()) {
+    case 'cash':
+      return PaymentMethod.cash;
+    case 'card':
+      return PaymentMethod.card;
+    case 'wallet':
+      return PaymentMethod.wallet;
+    case 'upi':
+    default:
+      return PaymentMethod.upi;
+  }
+}
+
 enum OrderStatus {
   pending,
   preparing,
@@ -67,6 +111,8 @@ class Order {
   final int queuePosition;
   final String? itemsSummary; // For history display without full items
   final TimeSlot? selectedSlot;
+  final String? shopId;
+  final PaymentMethod paymentMethod;
 
   Order({
     required this.id,
@@ -78,6 +124,8 @@ class Order {
     required this.queuePosition,
     this.itemsSummary,
     this.selectedSlot,
+    this.shopId,
+    this.paymentMethod = PaymentMethod.upi,
   });
 
   /// Short ID for display (last 6 hex characters of MongoDB ObjectID)
@@ -90,6 +138,8 @@ class Order {
     OrderStatus? status,
     int? queuePosition,
     int? estimatedMinutes,
+    String? shopId,
+    PaymentMethod? paymentMethod,
   }) =>
       Order(
         id: id,
@@ -101,6 +151,8 @@ class Order {
         queuePosition: queuePosition ?? this.queuePosition,
         itemsSummary: itemsSummary,
         selectedSlot: selectedSlot,
+        shopId: shopId ?? this.shopId,
+        paymentMethod: paymentMethod ?? this.paymentMethod,
       );
 
   String get displaySummary {
@@ -147,6 +199,15 @@ class Order {
       itemsSummaryStr = itemNames.join(', ');
     }
 
+    // Parse shopId — may be a string ID or a populated object
+    String? shopId;
+    final shopRaw = json['shopId'] ?? json['shop'];
+    if (shopRaw is String) {
+      shopId = shopRaw;
+    } else if (shopRaw is Map) {
+      shopId = (shopRaw['_id'] ?? shopRaw['id'])?.toString();
+    }
+
     return Order(
       id: (json['_id'] ?? json['id'] ?? '').toString(),
       items: const [], // Full CartItem objects are only available client-side
@@ -167,6 +228,8 @@ class Order {
           : (json['slotId'] != null && json['slotId'] is Map
               ? TimeSlot.fromJson(json['slotId'] as Map<String, dynamic>)
               : null),
+      shopId: shopId,
+      paymentMethod: _parsePaymentMethod(json['paymentMethod'] as String?),
     );
   }
 
@@ -183,5 +246,7 @@ class Order {
         'placedAt': placedAt.toIso8601String(),
         'estimatedMinutes': estimatedMinutes,
         'queuePosition': queuePosition,
+        if (shopId != null) 'shopId': shopId,
+        'paymentMethod': paymentMethod.name,
       };
 }

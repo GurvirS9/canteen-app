@@ -22,8 +22,22 @@ class AppConstants {
   static const String slotsCheckEndpoint = '/slots/check';
   static const String ordersEndpoint = '/orders';
   static const String activeOrdersEndpoint = '/orders/active';
+  static const String ordersQueueEndpoint = '/orders/queue';
   // Use with string interpolation: '/orders/$id/status'
   static String orderStatusEndpoint(String id) => '/orders/$id/status';
+
+  // Shops
+  static const String shopsEndpoint = '/shops';
+  static String shopEndpoint(String id) => '/shops/$id';
+  static String shopStatusEndpoint(String id) => '/shops/$id/status';
+
+  // Users
+  static String userFcmEndpoint(String id) => '/users/$id/fcm-token';
+
+  // Analytics
+  static const String analyticsEndpoint = '/analytics';
+  static const String predictionEndpoint = '/prediction';
+  static const String summaryEndpoint = '/summary';
 
 
 
