@@ -34,8 +34,9 @@ class _MainShellState extends ConsumerState<MainShell> {
     final shopState = ref.watch(shopProvider);
     final selectedShopName = shopState.selectedShop?.name;
     
-    // Banner shown on all tabs except the Queue tab (index 3)
-    final showBanner = widget.currentIndex != 3 && orderState.hasActiveOrder;
+    // Tabs: 0=Shops, 1=Cart, 2=Queue, 3=Alerts, 4=Profile
+    // Banner shown on all tabs except the Queue tab (index 2)
+    final showBanner = widget.currentIndex != 2 && orderState.hasActiveOrder;
 
     return Scaffold(
       body: Column(
@@ -62,11 +63,6 @@ class _MainShellState extends ConsumerState<MainShell> {
               icon: const Icon(Icons.store_outlined),
               activeIcon: const Icon(Icons.store_rounded),
               label: selectedShopName != null ? selectedShopName.split(' ').first : 'Shops',
-            ),
-            const BottomNavigationBarItem(
-              icon: Icon(Icons.restaurant_menu_outlined),
-              activeIcon: Icon(Icons.restaurant_menu_rounded),
-              label: 'Menu',
             ),
             BottomNavigationBarItem(
               icon: Stack(

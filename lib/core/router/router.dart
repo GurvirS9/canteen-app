@@ -61,6 +61,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           return OrderSuccessScreen(order: order);
         },
       ),
+      // Home screen kept as a standalone push-route (accessible from shop detail)
+      // but no longer part of the bottom-nav shell.
+      GoRoute(
+        path: '/home',
+        builder: (context, state) => const HomeScreen(),
+      ),
       ShellRoute(
         builder: (context, state, child) {
           final index = _indexFromLocation(state.matchedLocation);
@@ -73,31 +79,31 @@ final routerProvider = Provider<GoRouter>((ref) {
           );
         },
         routes: [
+          // Tab 0 — Shops
           GoRoute(
             path: '/shops',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: ShopListScreen()),
           ),
-          GoRoute(
-            path: '/home',
-            pageBuilder: (context, state) =>
-                const NoTransitionPage(child: HomeScreen()),
-          ),
+          // Tab 1 — Cart
           GoRoute(
             path: '/cart',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: CartScreen(showBackButton: false)),
           ),
+          // Tab 2 — Queue
           GoRoute(
             path: '/queue',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: QueueScreen()),
           ),
+          // Tab 3 — Notifications / Alerts
           GoRoute(
             path: '/notifications',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: NotificationsScreen()),
           ),
+          // Tab 4 — Profile
           GoRoute(
             path: '/profile',
             pageBuilder: (context, state) =>
@@ -109,13 +115,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+/// Maps a route location to a bottom-nav tab index.
+/// Tabs: 0=Shops, 1=Cart, 2=Queue, 3=Notifications, 4=Profile
 int _indexFromLocation(String location) {
   if (location.startsWith('/shops')) return 0;
-  if (location.startsWith('/home')) return 1;
-  if (location.startsWith('/cart')) return 2;
-  if (location.startsWith('/queue')) return 3;
-  if (location.startsWith('/notifications')) return 4;
-  if (location.startsWith('/profile')) return 5;
+  if (location.startsWith('/cart')) return 1;
+  if (location.startsWith('/queue')) return 2;
+  if (location.startsWith('/notifications')) return 3;
+  if (location.startsWith('/profile')) return 4;
   return 0;
 }
 
@@ -124,14 +131,12 @@ String _locationFromIndex(int index) {
     case 0:
       return '/shops';
     case 1:
-      return '/home';
-    case 2:
       return '/cart';
-    case 3:
+    case 2:
       return '/queue';
-    case 4:
+    case 3:
       return '/notifications';
-    case 5:
+    case 4:
       return '/profile';
     default:
       return '/shops';
