@@ -1,79 +1,58 @@
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase;
+import 'package:supabase_flutter/supabase_flutter.dart' as supa;
 import 'package:student_app/data/models/user.dart';
 import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/utils/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   static final AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
 
+  final _auth = supa.Supabase.instance.client.auth;
+
   User? _currentUser;
   User? get currentUser => _currentUser;
+  bool get isLoggedIn => _currentUser != null;
 
-  final firebase.FirebaseAuth _firebaseAuth = firebase.FirebaseAuth.instance;
+  User _mapSession(supa.Session session, [supa.User? supaUser]) {
+    final u = supaUser ?? session.user;
+    final meta = u.userMetadata ?? {};
+    return User(
+      id: u.id, // proper UUID ✅
+      name: meta['full_name'] as String? ??
+            meta['name'] as String? ?? 'Student',
+      email: u.email ?? '',
+      role: 'user',
+    );
+  }
 
-  Future<User?> checkSession() async {
-    try {
-      final firebaseUser = _firebaseAuth.currentUser;
-      if (firebaseUser != null) {
-        _currentUser = User(
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName ?? 'Student',
-          email: firebaseUser.email ?? '',
-          phone: firebaseUser.phoneNumber ?? '',
-          rollNumber: '',
-          avatarUrl: firebaseUser.photoURL ?? '',
-        );
-        return _currentUser;
-      }
-    } catch (e) {
-      AppLogger.e('AuthService', 'Firebase Auth session check failed: $e');
-    }
-    return null;
+  User? checkSession() {
+    final session = _auth.currentSession;
+    if (session == null) return null;
+    _currentUser = _mapSession(session);
+    return _currentUser;
   }
 
   Future<User> login(String email, String password) async {
     try {
-      final credential = await _firebaseAuth.signInWithEmailAndPassword(
+      final response = await _auth.signInWithPassword(
         email: email.trim(),
         password: password,
       );
-
-      final firebaseUser = credential.user;
-      if (firebaseUser == null) throw Exception('Login failed. User is null.');
-
-      _currentUser = User(
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName ?? 'Student',
-        email: firebaseUser.email ?? '',
-        phone: firebaseUser.phoneNumber ?? '',
-        rollNumber: '',
-        avatarUrl: firebaseUser.photoURL ?? '',
-      );
-
-      final token = await firebaseUser.getIdToken();
-      final prefs = await SharedPreferences.getInstance();
-      if (token != null) {
-        await prefs.setString(AppConstants.authTokenKey, token);
+      if (response.session == null) {
+        throw Exception('Login failed. No session returned.');
       }
-
+      _currentUser = _mapSession(response.session!, response.user);
       return _currentUser!;
-    } on firebase.FirebaseAuthException catch (e) {
+    } on supa.AuthException catch (e) {
       String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No user found for that email.';
-          break;
-        case 'wrong-password':
-          message = 'Wrong password provided for that user.';
-          break;
-        case 'invalid-email':
-          message = 'The email address is not valid.';
+      switch (e.statusCode) {
+        case '400':
+          message = 'Invalid email or password.';
           break;
         default:
-          message = e.message ?? 'Authentication failed.';
+          message = e.message;
       }
       throw Exception(message);
     } catch (e) {
@@ -83,46 +62,34 @@ class AuthService {
 
   Future<User> signup(String name, String email, String password) async {
     try {
-      final credential = await _firebaseAuth.createUserWithEmailAndPassword(
+      final response = await _auth.signUp(
         email: email.trim(),
         password: password,
+        data: {'full_name': name.trim()},
       );
-
-      final firebaseUser = credential.user;
-      if (firebaseUser == null) throw Exception('Signup failed. User is null.');
-
-      await firebaseUser.updateDisplayName(name.trim());
-
-      _currentUser = User(
-        id: firebaseUser.uid,
-        name: name.trim(),
-        email: firebaseUser.email ?? '',
-        phone: firebaseUser.phoneNumber ?? '',
-        rollNumber: '',
-        avatarUrl: firebaseUser.photoURL ?? '',
-      );
-
-      final token = await firebaseUser.getIdToken();
-      final prefs = await SharedPreferences.getInstance();
-      if (token != null) {
-        await prefs.setString(AppConstants.authTokenKey, token);
+      if (response.session == null) {
+        // Email confirmation required
+        final u = response.user;
+        if (u == null) throw Exception('Signup failed. User is null.');
+        _currentUser = User(
+          id: u.id,
+          name: name.trim(),
+          email: u.email ?? email,
+          role: 'user',
+        );
+        AppLogger.w('AuthService', 'signup() email confirmation required');
+        return _currentUser!;
       }
-
+      _currentUser = _mapSession(response.session!, response.user);
       return _currentUser!;
-    } on firebase.FirebaseAuthException catch (e) {
+    } on supa.AuthException catch (e) {
       String message;
-      switch (e.code) {
-        case 'email-already-in-use':
+      switch (e.statusCode) {
+        case '422':
           message = 'An account already exists for that email.';
           break;
-        case 'weak-password':
-          message = 'The password provided is too weak.';
-          break;
-        case 'invalid-email':
-          message = 'The email address is not valid.';
-          break;
         default:
-          message = e.message ?? 'Registration failed.';
+          message = e.message;
       }
       throw Exception(message);
     } catch (e) {
@@ -132,20 +99,9 @@ class AuthService {
 
   Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
-    } on firebase.FirebaseAuthException catch (e) {
-      String message;
-      switch (e.code) {
-        case 'user-not-found':
-          message = 'No user found for that email.';
-          break;
-        case 'invalid-email':
-          message = 'The email address is not valid.';
-          break;
-        default:
-          message = e.message ?? 'Failed to send password reset email.';
-      }
-      throw Exception(message);
+      await _auth.resetPasswordForEmail(email.trim());
+    } on supa.AuthException catch (e) {
+      throw Exception(e.message);
     } catch (e) {
       throw Exception('An unknown error occurred: $e');
     }
@@ -153,9 +109,9 @@ class AuthService {
 
   Future<void> logout() async {
     try {
-      await _firebaseAuth.signOut();
+      await _auth.signOut();
     } catch (e) {
-      AppLogger.e('AuthService', 'Firebase logout failed: $e');
+      AppLogger.e('AuthService', 'Supabase logout failed: $e');
     } finally {
       _currentUser = null;
       final prefs = await SharedPreferences.getInstance();
@@ -163,6 +119,4 @@ class AuthService {
       await prefs.remove(AppConstants.authTokenKey);
     }
   }
-
-  bool get isLoggedIn => _currentUser != null;
 }
