@@ -7,24 +7,21 @@ import 'package:student_app/core/constants/app_constants.dart';
 import 'package:student_app/core/theme/app_theme.dart';
 import 'package:student_app/core/utils/logger.dart';
 import 'package:student_app/core/router/router.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    // Disable app verification for testing to avoid emulator reCAPTCHA errors
-    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
-  } catch (e) {
-    AppLogger.e('Main', 'Failed to initialize Firebase: $e');
-  }
-  
+  await dotenv.load(fileName: ".env");
+  await Supabase.initialize(
+    url: AppConstants.supabaseUrl,
+    anonKey: AppConstants.supabaseAnonKey,
+  );
   runApp(const ProviderScope(child: CampusEatsApp()));
 }
+
+
+
 
 class CampusEatsApp extends ConsumerStatefulWidget {
   const CampusEatsApp({super.key});

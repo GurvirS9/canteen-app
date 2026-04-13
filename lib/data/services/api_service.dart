@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
-import 'package:firebase_auth/firebase_auth.dart' as firebase;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:student_app/data/models/cart_item.dart';
 import 'package:student_app/data/models/menu_item.dart';
 import 'package:student_app/data/models/order.dart';
@@ -30,24 +30,19 @@ class ApiService {
   Uri _uri(String endpoint) =>
       Uri.parse('${AppConstants.baseUrl}$endpoint');
 
-  /// Build headers with Content-Type and Firebase Auth token.
-  /// Tries a force-refreshed Firebase ID token first; falls back to the
-  /// backend's dev-bypass key if no user is signed in.
+  /// Build headers with Content-Type and Supabase session token.
+  /// Falls back to the backend's dev-bypass key if no session is active.
   Future<Map<String, String>> _headers() async {
     final headers = <String, String>{'Content-Type': 'application/json'};
     try {
-      final user = firebase.FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        // forceRefresh: true ensures we never send an expired token
-        final token = await user.getIdToken(true);
-        if (token != null && token.isNotEmpty) {
-          headers['Authorization'] = 'Bearer $token';
-          AppLogger.d(_tag, '_headers() Firebase token attached (force-refreshed)');
-          return headers;
-        }
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null && session.accessToken.isNotEmpty) {
+        headers['Authorization'] = 'Bearer ${session.accessToken}';
+        AppLogger.d(_tag, '_headers() Supabase token attached');
+        return headers;
       }
     } catch (e) {
-      AppLogger.w(_tag, '_headers() Firebase token failed: $e — falling back to dev key');
+      AppLogger.w(_tag, '_headers() Supabase token failed: $e — falling back to dev key');
     }
     // Fallback: use the backend's Swagger dev-key bypass (dev/test only)
     headers['Authorization'] = 'Bearer ${AppConstants.devAuthKey}';
@@ -213,9 +208,9 @@ class ApiService {
   /// GET /orders/active – Get active orders for current user (identified by auth token)
   Future<List<Order>> getActiveOrders() async {
     AppLogger.i(_tag, 'getActiveOrders()');
-    final uid = firebase.FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      AppLogger.w(_tag, 'getActiveOrders() no Firebase user, returning empty');
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session == null) {
+      AppLogger.w(_tag, 'getActiveOrders() no Supabase session, returning empty');
       return [];
     }
     final response = await _get(AppConstants.activeOrdersEndpoint);

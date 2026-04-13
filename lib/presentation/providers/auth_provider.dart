@@ -11,12 +11,15 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   final AuthService _authService;
 
-  AuthNotifier(this._authService) : super(const AsyncValue.loading());
+  AuthNotifier(this._authService) : super(const AsyncValue.data(null)) {
+    // Supabase persists sessions — restore synchronously after initialize()
+    final user = _authService.checkSession();
+    state = AsyncValue.data(user);
+  }
 
   Future<void> checkSession() async {
-    state = const AsyncValue.loading();
     try {
-      final user = await _authService.checkSession();
+      final user = _authService.checkSession();
       state = AsyncValue.data(user);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
