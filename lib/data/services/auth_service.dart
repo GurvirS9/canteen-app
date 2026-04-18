@@ -47,12 +47,16 @@ class AuthService {
       return _currentUser!;
     } on supa.AuthException catch (e) {
       String message;
-      switch (e.statusCode) {
-        case '400':
-          message = 'Invalid email or password.';
-          break;
-        default:
-          message = e.message;
+      if (e.message.toLowerCase().contains('rate limit')) {
+        message = 'Too many attempts. Please try again later.';
+      } else {
+        switch (e.statusCode) {
+          case '400':
+            message = 'Invalid email or password.';
+            break;
+          default:
+            message = e.message;
+        }
       }
       throw Exception(message);
     } catch (e) {
