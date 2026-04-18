@@ -285,7 +285,7 @@ class _ShopListScreenState extends ConsumerState<ShopListScreen> {
 
   void _commitSelectShop(Shop shop) {
     ref.read(shopProvider.notifier).selectShop(shop);
-    context.go('/home');
+    context.push('/home');
   }
 }
 
